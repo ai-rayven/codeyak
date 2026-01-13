@@ -34,7 +34,8 @@ def main():
         llm = AzureAdapter(
             api_key=settings.AZURE_OPENAI_API_KEY,
             endpoint=settings.AZURE_OPENAI_ENDPOINT,
-            deployment_name=settings.AZURE_DEPLOYMENT_NAME
+            deployment_name=settings.AZURE_DEPLOYMENT_NAME,
+            api_version=settings.AZURE_OPENAI_API_VERSION
         )
     except Exception as e:
         print(f"❌ Configuration Error: {e}")
