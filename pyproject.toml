@@ -1,0 +1,23 @@
+[project]
+name = "code-reviewer"
+version = "0.0.1"
+description = "A code review agent optimized for running in CI pipelines"
+readme = "README.md"
+authors = [
+    { name = "rai", email = "raiselmartinez@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "instructor>=1.14.1",
+    "langfuse>=3.11.2",
+    "openai>=2.15.0",
+    "pydantic-settings>=2.12.0",
+    "python-gitlab>=7.1.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/code-reviewer"]
