@@ -27,6 +27,5 @@ class AzureAdapter(LLMClient):
         return self.client.chat.completions.create(
             model=self.deployment,
             response_model=response_model,
-            messages=messages,
-            temperature=0.0, # Keep it deterministic
+            messages=messages
         )
