@@ -34,7 +34,7 @@ class ReviewEngine:
             
             self._process_results(mr_id, result)
 
-            print(f" {json.dumps(result)}")
+            print(f" {result.model_dump_json()}")
 
         print("✅ Review complete.")
 
