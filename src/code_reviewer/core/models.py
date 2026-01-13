@@ -41,10 +41,17 @@ class GuidelineViolation(BaseModel):
     line_number: int
     guideline_id: str = Field(..., description="MUST match the ID of the provided Guideline.")
     reasoning: str = Field(..., description="Brief explanation of why this code violates the rule.")
-    
+
     def to_comment(self) -> str:
-        """Formats the output for GitLab"""
+        """Formats the output for GitLab inline comments"""
         return f"**Violation of {self.guideline_id}**: {self.reasoning}"
+
+    def to_general_comment(self) -> str:
+        """Formats the output for general GitLab comments (with file and line reference)"""
+        return (
+            f"**Violation at `{self.file_path}:{self.line_number}`**\n\n"
+            f"**{self.guideline_id}**: {self.reasoning}"
+        )
 
 class ReviewResult(BaseModel):
     """

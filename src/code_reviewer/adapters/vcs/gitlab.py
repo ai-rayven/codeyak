@@ -1,10 +1,10 @@
 import gitlab
-import os
 from typing import List
 from gitlab.v4.objects import ProjectMergeRequest
 
 from ...core.ports import VCSClient
 from ...core.models import FileDiff, GuidelineViolation
+from ...core.exceptions import LineNotInDiffError, VCSCommentError
 
 class GitLabAdapter(VCSClient):
     def __init__(self, url: str, token: str, project_id: str):
@@ -35,12 +35,18 @@ class GitLabAdapter(VCSClient):
                 file_path=change['new_path'],
                 old_path=change['old_path'],
                 diff_content=change['diff'],
-                language=self._detect_language(change['new_path'])
             ))
             
         return diffs
 
     def post_comment(self, mr_id: str, violation: GuidelineViolation) -> None:
+        """
+        Post an inline comment on a specific line in the MR diff.
+
+        Raises:
+            LineNotInDiffError: When the line is not part of the diff
+            VCSCommentError: When posting fails for other reasons
+        """
         mr = self._get_mr(mr_id)
 
         # We need the "diff_refs" to anchor the comment to a specific version
@@ -62,24 +68,30 @@ class GitLabAdapter(VCSClient):
         try:
             mr.discussions.create(payload)
             print(f"✅ Posted comment on {violation.file_path}:{violation.line_number}")
+        except gitlab.exceptions.GitlabCreateError as e:
+            # Translate GitLab-specific exceptions to domain exceptions
+            if e.response_code == 400 and 'line_code' in str(e):
+                raise LineNotInDiffError(
+                    f"Line {violation.line_number} in {violation.file_path} is not part of the diff"
+                ) from e
+            else:
+                raise VCSCommentError(f"Failed to post comment: {e}") from e
         except Exception as e:
-            print(f"❌ Failed to post comment: {e}")
+            raise VCSCommentError(f"Unexpected error posting comment: {e}") from e
 
     def post_general_comment(self, mr_id: str, message: str) -> None:
-        """Post a general comment on the MR (not tied to a specific line)."""
+        """
+        Post a general comment on the MR (not tied to a specific line).
+
+        Raises:
+            VCSCommentError: When posting fails
+        """
         mr = self._get_mr(mr_id)
 
         try:
             mr.notes.create({'body': message})
-            print(f"✅ Posted general comment on MR")
+            print("✅ Posted general comment on MR")
+        except gitlab.exceptions.GitlabCreateError as e:
+            raise VCSCommentError(f"Failed to post general comment: {e}") from e
         except Exception as e:
-            print(f"❌ Failed to post general comment: {e}")
-
-    def _detect_language(self, path: str) -> str:
-        """Simple extension-based detection"""
-        ext = path.split('.')[-1].lower()
-        mapping = {
-            'py': 'python', 'js': 'javascript', 'ts': 'typescript', 
-            'java': 'java', 'cs': 'csharp', 'go': 'go'
-        }
-        return mapping.get(ext, 'text')
+            raise VCSCommentError(f"Unexpected error posting general comment: {e}") from e
