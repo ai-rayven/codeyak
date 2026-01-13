@@ -17,7 +17,7 @@ class AzureAdapter(LLMClient):
         )
         
         # Patch with Instructor for structured outputs
-        self.client = instructor.from_provider(client)
+        self.client = instructor.from_openai(client)
         self.deployment = deployment_name 
 
     def generate(self, messages: List[dict], response_model: Type[T]) -> T:
