@@ -15,6 +15,11 @@ class VCSClient(ABC):
     def post_comment(self, mr_id: str, violation: GuidelineViolation) -> None:
         pass
 
+    @abstractmethod
+    def post_general_comment(self, mr_id: str, message: str) -> None:
+        """Post a general comment on the MR (not tied to a specific line)."""
+        pass
+
 class LLMClient(ABC):
     @abstractmethod
     def generate(self, messages: List[dict], response_model: Type[T]) -> T:

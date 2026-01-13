@@ -25,24 +25,33 @@ class ReviewEngine:
         print(f"Split {len(diffs)} files into {len(groups)} analysis groups.")
 
         # 3. Analyze each group
+        total_violations = 0
         for group in groups:
             print(f"   Processing Group {group.group_id} ({len(group.files)} files)...")
-            
+
             messages = build_review_messages(group.files, guidelines)
-            
+
             result = self.llm.generate(messages, response_model=ReviewResult)
-            
-            self._process_results(mr_id, result)
+
+            violations_count = self._process_results(mr_id, result)
+            total_violations += violations_count
 
             print(f" {result.model_dump_json()}")
 
+        # 4. Post success comment if no violations found
+        if total_violations == 0:
+            success_message = "✅ Code review completed successfully! No guideline violations found."
+            self.vcs.post_general_comment(mr_id, success_message)
+            print("No violations found - posted success comment.")
+
         print("✅ Review complete.")
 
-    def _process_results(self, mr_id: str, result: ReviewResult):
-        """Iterates through findings and posts them to GitLab."""
+    def _process_results(self, mr_id: str, result: ReviewResult) -> int:
+        """Iterates through findings and posts them to GitLab. Returns count of violations."""
         for violation in result.violations:
             print(f"     found {violation.guideline_id} in {violation.file_path}")
             self.vcs.post_comment(mr_id, violation)
+        return len(result.violations)
 
     def _load_guidelines(self) -> List[Guideline]:
         """

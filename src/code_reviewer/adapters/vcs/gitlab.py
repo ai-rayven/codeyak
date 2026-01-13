@@ -42,11 +42,11 @@ class GitLabAdapter(VCSClient):
 
     def post_comment(self, mr_id: str, violation: GuidelineViolation) -> None:
         mr = self._get_mr(mr_id)
-        
+
         # We need the "diff_refs" to anchor the comment to a specific version
         # otherwise GitLab rejects the position.
         diff_refs = mr.diff_refs
-        
+
         payload = {
             "body": violation.to_comment(),
             "position": {
@@ -58,12 +58,22 @@ class GitLabAdapter(VCSClient):
                 "new_line": violation.line_number,
             }
         }
-        
+
         try:
             mr.discussions.create(payload)
             print(f"✅ Posted comment on {violation.file_path}:{violation.line_number}")
         except Exception as e:
             print(f"❌ Failed to post comment: {e}")
+
+    def post_general_comment(self, mr_id: str, message: str) -> None:
+        """Post a general comment on the MR (not tied to a specific line)."""
+        mr = self._get_mr(mr_id)
+
+        try:
+            mr.notes.create({'body': message})
+            print(f"✅ Posted general comment on MR")
+        except Exception as e:
+            print(f"❌ Failed to post general comment: {e}")
 
     def _detect_language(self, path: str) -> str:
         """Simple extension-based detection"""
