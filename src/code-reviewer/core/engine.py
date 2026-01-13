@@ -1,4 +1,5 @@
 from typing import List
+import json
 from .ports import VCSClient, LLMClient
 from .models import Guideline, ReviewResult
 from .grouping import create_file_groups
@@ -10,7 +11,7 @@ class ReviewEngine:
         self.llm = llm
 
     def run(self, mr_id: str):
-        print(f"🚀 Starting review for MR {mr_id}...")
+        print(f"Starting review for MR {mr_id}...")
 
         # 1. Fetch & Parse Data
         diffs = self.vcs.get_diff(mr_id)
@@ -21,21 +22,19 @@ class ReviewEngine:
         # 2. Prepare Chunks (Grouping Logic)
         groups = create_file_groups(diffs)
         guidelines = self._load_guidelines()
-        print(f"📦 Split {len(diffs)} files into {len(groups)} analysis groups.")
+        print(f"Split {len(diffs)} files into {len(groups)} analysis groups.")
 
         # 3. Analyze each group
         for group in groups:
             print(f"   Processing Group {group.group_id} ({len(group.files)} files)...")
             
-            # A. Build Prompt (Pure Logic)
             messages = build_review_messages(group.files, guidelines)
             
-            # B. Call AI (Generic Gateway)
-            # We ask for a 'ReviewResult' object, and the adapter guarantees it.
             result = self.llm.generate(messages, response_model=ReviewResult)
             
-            # C. Post Comments (Side Effect)
             self._process_results(mr_id, result)
+
+            print(f" {json.dumps(result)}")
 
         print("✅ Review complete.")
 
@@ -53,17 +52,22 @@ class ReviewEngine:
         return [
             Guideline(
                 id="SEC-01", 
-                description="Avoid hardcoded secrets, API keys, or passwords.", 
-                severity="critical"
+                description="Avoid hardcoded secrets, API keys, or passwords."
             ),
             Guideline(
-                id="PERF-01", 
-                description="Avoid N+1 query problems inside loops.", 
-                severity="major"
+                id="STYLE-01", 
+                description="No long functions." 
+            ),
+            Guideline(
+                id="STYLE-02",
+                description="The code must be very easy to read and understand."
+            ),
+            Guideline(
+                id="STYLE-03",
+                description="No long functions and no God services."
             ),
             Guideline(
                 id="ERR-01", 
-                description="Do not use bare 'except:' clauses. Catch specific exceptions.", 
-                severity="minor"
+                description="Do not catch exceptions unless you are handling them. Let them bubble up.", 
             ),
         ]

@@ -10,13 +10,12 @@ def build_review_messages(diffs: List[FileDiff], guidelines: List[Guideline]) ->
     )
     
     for g in guidelines:
-        system_content += f"- [{g.id}] {g.description} (Severity: {g.severity})\n"
+        system_content += f"- [{g.id}] {g.description}\n"
         
     system_content += (
         "\nInstructions:\n"
         "1. Only report violations of the specific guidelines listed above.\n"
         "2. Ignore general best practices not in the list.\n"
-        "3. If code is ambiguous, do not report a violation."
     )
 
     # 2. User Prompt: Context + Code

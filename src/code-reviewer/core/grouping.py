@@ -3,6 +3,7 @@ from .models import FileDiff, FileGroup
 
 # 12,000 tokens * 3.5 chars/token = ~42,000 chars
 MAX_CHARS_PER_GROUP = 42000 
+TOKEN_TO_CHAR_ESTIMATE = 3.5
 
 def create_file_groups(diffs: List[FileDiff]) -> List[FileGroup]:
     groups = []
@@ -16,14 +17,14 @@ def create_file_groups(diffs: List[FileDiff]) -> List[FileGroup]:
         content_len = len(diff.file_path) + len(diff.diff_content)
         
         # Store for debugging (no longer called 'tokens')
-        diff.tokens = int(content_len / 3.5) 
+        diff.tokens = int(content_len / TOKEN_TO_CHAR_ESTIMATE) 
 
         # 2. Check overflow
         if current_batch and (current_chars + content_len > MAX_CHARS_PER_GROUP):
             groups.append(FileGroup(
                 files=current_batch,
                 group_id=group_id,
-                total_tokens=int(current_chars / 3.5) # Approximate
+                total_tokens=int(current_chars / TOKEN_TO_CHAR_ESTIMATE) # Approximate
             ))
             group_id += 1
             current_batch = []
@@ -36,7 +37,7 @@ def create_file_groups(diffs: List[FileDiff]) -> List[FileGroup]:
         groups.append(FileGroup(
             files=current_batch,
             group_id=group_id,
-            total_tokens=int(current_chars / 3.5)
+            total_tokens=int(current_chars / TOKEN_TO_CHAR_ESTIMATE)
         ))
 
     return groups

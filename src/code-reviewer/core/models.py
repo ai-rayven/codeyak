@@ -12,7 +12,6 @@ class Guideline(BaseModel):
     """
     id: str = Field(..., description="Unique ID (e.g., 'SEC-001', 'STY-005')")
     description: str = Field(..., description="The clear instruction for the AI.")
-    severity: str = Field("minor", description="critical, major, or minor")
 
 class FileDiff(BaseModel):
     """
