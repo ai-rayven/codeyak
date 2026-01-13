@@ -1,7 +1,7 @@
 [project]
 name = "code-reviewer"
 version = "0.0.1"
-description = "A code review agent optimized for running in CI pipelines"
+description = "A code review agent optimized for following strict guidelines"
 readme = "README.md"
 authors = [
     { name = "rai", email = "raiselmartinez@gmail.com" }
