@@ -20,3 +20,12 @@ class VCSCommentError(Exception):
     other than the line not being in the diff.
     """
     pass
+
+
+class VCSFetchCommentsError(Exception):
+    """
+    Raised when fetching comments from the VCS fails.
+
+    This is separate from VCSCommentError which is used for posting comments.
+    """
+    pass

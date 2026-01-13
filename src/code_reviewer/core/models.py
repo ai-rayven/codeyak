@@ -31,6 +31,35 @@ class FileGroup(BaseModel):
     group_id: int
     total_tokens: int
 
+class MRComment(BaseModel):
+    """
+    Represents a comment from a merge request (both inline and general).
+    """
+    id: str = Field(..., description="Unique comment ID")
+    body: str = Field(..., description="The text content of the comment")
+    author: str = Field(..., description="Username of the comment author")
+    created_at: str = Field(..., description="Timestamp of comment creation")
+
+    # Optional fields for inline comments (None for general comments)
+    file_path: Optional[str] = Field(None, description="File path for inline comments")
+    line_number: Optional[int] = Field(None, description="Line number for inline comments")
+
+    is_inline: bool = Field(..., description="True if inline comment, False if general")
+
+    def overlaps_with_violation(self, violation: 'GuidelineViolation') -> bool:
+        """
+        Check if this comment overlaps with a violation (within 3-line tolerance).
+        """
+        if not self.is_inline or not self.file_path:
+            return False
+        if self.file_path != violation.file_path:
+            return False
+        if self.line_number is None:
+            return False
+
+        line_tolerance = 3
+        return abs(self.line_number - violation.line_number) <= line_tolerance
+
 # --- Outputs (What the Agent returns) ---
 
 class GuidelineViolation(BaseModel):

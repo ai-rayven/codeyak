@@ -3,8 +3,8 @@ from typing import List
 from gitlab.v4.objects import ProjectMergeRequest
 
 from ...core.ports import VCSClient
-from ...core.models import FileDiff, GuidelineViolation
-from ...core.exceptions import LineNotInDiffError, VCSCommentError
+from ...core.models import FileDiff, GuidelineViolation, MRComment
+from ...core.exceptions import LineNotInDiffError, VCSCommentError, VCSFetchCommentsError
 
 class GitLabAdapter(VCSClient):
     def __init__(self, url: str, token: str, project_id: str):
@@ -95,3 +95,93 @@ class GitLabAdapter(VCSClient):
             raise VCSCommentError(f"Failed to post general comment: {e}") from e
         except Exception as e:
             raise VCSCommentError(f"Unexpected error posting general comment: {e}") from e
+
+    def get_comments(self, mr_id: str) -> List[MRComment]:
+        """
+        Fetch all comments from GitLab MR (discussions + notes).
+
+        Raises:
+            VCSFetchCommentsError: When fetching comments fails
+        """
+        mr = self._get_mr(mr_id)
+        comments = []
+
+        try:
+            # 1. Fetch discussions (includes inline diff comments)
+            discussions = mr.discussions.list(get_all=True)
+
+            for discussion in discussions:
+                notes_data = discussion.attributes.get('notes', [])
+
+                for note_dict in notes_data:
+                    comment_id = str(note_dict.get('id', ''))
+                    body = note_dict.get('body', '')
+                    author_dict = note_dict.get('author', {})
+                    author = author_dict.get('username', 'unknown')
+                    created_at = note_dict.get('created_at', '')
+
+                    position = note_dict.get('position')
+
+                    if position and position.get('position_type') == 'text':
+                        # Inline comment
+                        file_path = position.get('new_path') or position.get('old_path')
+                        line_number = position.get('new_line') or position.get('old_line')
+
+                        comments.append(MRComment(
+                            id=comment_id,
+                            body=body,
+                            author=author,
+                            created_at=created_at,
+                            file_path=file_path,
+                            line_number=line_number,
+                            is_inline=True
+                        ))
+                    else:
+                        # General comment
+                        comments.append(MRComment(
+                            id=comment_id,
+                            body=body,
+                            author=author,
+                            created_at=created_at,
+                            is_inline=False
+                        ))
+
+            # 2. Fetch standalone notes (avoid duplicates)
+            notes = mr.notes.list(get_all=True)
+
+            for note in notes:
+                note_id = str(note.id)
+                if any(c.id == note_id for c in comments):
+                    continue
+
+                comments.append(MRComment(
+                    id=note_id,
+                    body=note.body,
+                    author=note.author.get('username', 'unknown') if hasattr(note, 'author') else 'unknown',
+                    created_at=note.created_at,
+                    is_inline=False
+                ))
+
+            # Sort chronologically
+            comments.sort(key=lambda c: c.created_at)
+
+            print(f"📝 Fetched {len(comments)} comments from MR {mr_id}")
+
+            # Print out each comment for visibility
+            if comments:
+                print("\n=== EXISTING COMMENTS ===")
+                for comment in comments:
+                    if comment.is_inline:
+                        print(f"  [{comment.author}] {comment.file_path}:{comment.line_number}")
+                        print(f"    {comment.body}")
+                    else:
+                        print(f"  [{comment.author}] (General comment)")
+                        print(f"    {comment.body}")
+                print("=== END COMMENTS ===\n")
+
+            return comments
+
+        except gitlab.exceptions.GitlabGetError as e:
+            raise VCSFetchCommentsError(f"Failed to fetch comments: {e}") from e
+        except Exception as e:
+            raise VCSFetchCommentsError(f"Unexpected error fetching comments: {e}") from e
