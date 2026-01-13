@@ -134,15 +134,20 @@ class GitLabAdapter(VCSClient):
                             created_at=created_at,
                             file_path=file_path,
                             line_number=line_number,
+                            guideline_id=MRComment.parse_guideline_id(body),
                             is_inline=True
                         ))
                     else:
-                        # General comment
+                        # General comment - try to parse file/line info
+                        parsed_file, parsed_line = MRComment.parse_file_and_line(body)
                         comments.append(MRComment(
                             id=comment_id,
                             body=body,
                             author=author,
                             created_at=created_at,
+                            file_path=parsed_file,
+                            line_number=parsed_line,
+                            guideline_id=MRComment.parse_guideline_id(body),
                             is_inline=False
                         ))
 
@@ -154,11 +159,16 @@ class GitLabAdapter(VCSClient):
                 if any(c.id == note_id for c in comments):
                     continue
 
+                # Try to parse file/line info from general comment body
+                parsed_file, parsed_line = MRComment.parse_file_and_line(note.body)
                 comments.append(MRComment(
                     id=note_id,
                     body=note.body,
                     author=note.author.get('username', 'unknown') if hasattr(note, 'author') else 'unknown',
                     created_at=note.created_at,
+                    file_path=parsed_file,
+                    line_number=parsed_line,
+                    guideline_id=MRComment.parse_guideline_id(note.body),
                     is_inline=False
                 ))
 
@@ -171,11 +181,16 @@ class GitLabAdapter(VCSClient):
             if comments:
                 print("\n=== EXISTING COMMENTS ===")
                 for comment in comments:
+                    guideline_info = f" [{comment.guideline_id}]" if comment.guideline_id else ""
                     if comment.is_inline:
-                        print(f"  [{comment.author}] {comment.file_path}:{comment.line_number}")
+                        print(f"  [{comment.author}] {comment.file_path}:{comment.line_number}{guideline_info}")
                         print(f"    {comment.body}")
                     else:
-                        print(f"  [{comment.author}] (General comment)")
+                        # General comment - show parsed location if available
+                        if comment.file_path and comment.line_number:
+                            print(f"  [{comment.author}] (General) {comment.file_path}:{comment.line_number}{guideline_info}")
+                        else:
+                            print(f"  [{comment.author}] (General comment){guideline_info}")
                         print(f"    {comment.body}")
                 print("=== END COMMENTS ===\n")
 

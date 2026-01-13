@@ -100,7 +100,7 @@ class ReviewEngine:
             )
 
             if is_duplicate:
-                print(f"     ⏭️  Skipping duplicate: {violation.file_path}:{violation.line_number}")
+                print(f"     ⏭️  Skipping duplicate: {violation.guideline_id} at {violation.file_path}:{violation.line_number}")
                 filtered_count += 1
             else:
                 filtered_violations.append(violation)
