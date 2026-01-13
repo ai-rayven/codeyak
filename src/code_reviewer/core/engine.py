@@ -35,7 +35,8 @@ class ReviewEngine:
         print(f"Split {len(diffs)} files into {len(groups)} analysis groups.")
 
         # 3. Analyze each group
-        total_violations = 0
+        total_original_violations = 0
+        total_filtered_violations = 0
         for group in groups:
             print(f"   Processing Group {group.group_id} ({len(group.files)} files)...")
 
@@ -44,22 +45,25 @@ class ReviewEngine:
 
             result = self.llm.generate(messages, response_model=ReviewResult)
 
-            # Filter duplicates
-            filtered_result = self._filter_existing_violations(result, existing_comments)
+            # Filter duplicates and track both counts
+            filtered_result, original_count = self._filter_existing_violations(result, existing_comments)
+            total_original_violations += original_count
 
             violations_count = self._process_results(mr_id, filtered_result)
-            total_violations += violations_count
+            total_filtered_violations += violations_count
 
             print(f" {filtered_result.model_dump_json()}")
 
-        # 4. Post success if no violations
-        if total_violations == 0:
+        # 4. Post success comment if no violations were detected
+        if total_original_violations == 0:
             success_message = "✅ Code review completed successfully! No guideline violations found."
             try:
                 self.vcs.post_general_comment(mr_id, success_message)
                 print("No violations found - posted success comment.")
             except VCSCommentError as e:
                 print(f"⚠️  Could not post success comment: {e}")
+        elif total_filtered_violations == 0:
+            print("ℹ️  All detected violations were already reported in existing comments.")
 
         print("✅ Review complete.")
 
@@ -85,10 +89,19 @@ class ReviewEngine:
         self,
         result: ReviewResult,
         existing_comments: List[MRComment]
-    ) -> ReviewResult:
-        """Filter out violations that overlap with existing comments."""
+    ) -> tuple[ReviewResult, int]:
+        """
+        Filter out violations that overlap with existing comments.
+
+        Returns:
+            tuple: (filtered_result, original_count)
+                - filtered_result: ReviewResult with duplicates removed
+                - original_count: Number of violations before filtering
+        """
+        original_count = len(result.violations)
+
         if not existing_comments:
-            return result
+            return result, original_count
 
         filtered_violations = []
         filtered_count = 0
@@ -108,7 +121,7 @@ class ReviewEngine:
         if filtered_count > 0:
             print(f"     Filtered {filtered_count} duplicate violations")
 
-        return ReviewResult(violations=filtered_violations)
+        return ReviewResult(violations=filtered_violations), original_count
 
     def _load_guidelines(self) -> List[Guideline]:
         """
