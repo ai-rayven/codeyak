@@ -9,6 +9,9 @@ T = TypeVar("T", bound=BaseModel)
 
 class AzureAdapter(LLMClient):
     def __init__(self, api_key: str, endpoint: str, deployment_name: str, api_version: str="2025-04-01-preview"):
+        # Remove trailing slash from endpoint if present
+        endpoint = endpoint.rstrip('/')
+
         # Initialize standard client
         client = AzureOpenAI(
             api_key=api_key,
