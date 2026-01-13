@@ -19,9 +19,17 @@ class FileDiff(BaseModel):
     """
     file_path: str
     diff_content: str
-    
+
     # Simple token count for grouping (no logic needed yet)
-    tokens: int = 0 
+    tokens: int = 0
+
+class FileGroup(BaseModel):
+    """
+    A group of file diffs batched together for processing.
+    """
+    files: List['FileDiff']
+    group_id: int
+    total_tokens: int
 
 # --- Outputs (What the Agent returns) ---
 

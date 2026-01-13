@@ -8,7 +8,7 @@ from .core.engine import ReviewEngine
 def main():
     # 1. Parse CLI Arguments
     if len(sys.argv) < 2:
-        print("Usage: uv run python -m code_review_agent <MR_ID> [PROJECT_ID]")
+        print("Usage: uv run python -m code_reviewer <MR_ID> [PROJECT_ID]")
         sys.exit(1)
 
     mr_id = sys.argv[1]
