@@ -5,6 +5,20 @@ from .adapters.vcs.gitlab import GitLabAdapter
 from .adapters.llm.azure import AzureAdapter
 from .core.engine import ReviewEngine
 
+def log_settings():
+    # Log all settings for debugging
+    print("\n📋 Configuration Settings:")
+    print(f"  GITLAB_URL: {settings.GITLAB_URL}")
+    print(f"  GITLAB_TOKEN: {settings.GITLAB_TOKEN[:8]}...{settings.GITLAB_TOKEN[-4:] if len(settings.GITLAB_TOKEN) > 12 else '***'}")
+    print(f"  AZURE_OPENAI_API_KEY: {settings.AZURE_OPENAI_API_KEY[:8]}...{settings.AZURE_OPENAI_API_KEY[-4:] if len(settings.AZURE_OPENAI_API_KEY) > 12 else '***'}")
+    print(f"  AZURE_OPENAI_ENDPOINT: {settings.AZURE_OPENAI_ENDPOINT}")
+    print(f"  AZURE_OPENAI_API_VERSION: {settings.AZURE_OPENAI_API_VERSION}")
+    print(f"  AZURE_DEPLOYMENT_NAME: {settings.AZURE_DEPLOYMENT_NAME}")
+    print(f"  LANGFUSE_SECRET_KEY: {'(set)' if settings.LANGFUSE_SECRET_KEY else '(not set)'}")
+    print(f"  LANGFUSE_PUBLIC_KEY: {'(set)' if settings.LANGFUSE_PUBLIC_KEY else '(not set)'}")
+    print(f"  LANGFUSE_HOST: {settings.LANGFUSE_HOST}")
+    print()
+
 def main():
     # 1. Parse CLI Arguments
     if len(sys.argv) < 2:
@@ -21,6 +35,8 @@ def main():
         sys.exit(1)
 
     print(f"🔧 Initializing Agent for Project {project_id}, MR {mr_id}...")
+
+    log_settings()
 
     # 2. Instantiate Adapters (The Plumbing)
     # We explicitly inject the dependencies here.
