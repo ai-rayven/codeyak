@@ -1,10 +1,8 @@
-# CodeYak 🐻 
+# CodeYak 🐻 - Guard your codebase
 
 <p align="center">
   <img src="images/codeyak-logo-circle.png" alt="CodeYak Logo" width="200"/>
 </p>
-
-** A powerful AI code review agent that guards your codebase. **
 
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-GitLab-orange)
