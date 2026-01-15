@@ -226,11 +226,10 @@ class TestLoadingBuiltinDefault:
         """Test successfully loading built-in default guidelines."""
         guideline_sets = manager._load_builtin_default()
 
-        # Default.yaml has 3 includes (security, readability, maintainability) and no local guidelines
-        assert len(guideline_sets) == 3
+        # Default.yaml has 2 includes (security, code-quality) and no local guidelines
+        assert len(guideline_sets) == 2
         assert "builtin/default.yaml→security.yaml" in guideline_sets
-        assert "builtin/default.yaml→readability.yaml" in guideline_sets
-        assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
+        assert "builtin/default.yaml→code-quality.yaml" in guideline_sets
 
         # Each set should have guidelines
         for set_name, guidelines in guideline_sets.items():
@@ -240,13 +239,12 @@ class TestLoadingBuiltinDefault:
         """Test that default.yaml with includes creates separate sets."""
         guideline_sets = manager._load_builtin_default()
 
-        # Should have 3 separate sets from includes
-        assert len(guideline_sets) == 3
+        # Should have 2 separate sets from includes
+        assert len(guideline_sets) == 2
 
         # Each included file should be a separate set
         assert "builtin/default.yaml→security.yaml" in guideline_sets
-        assert "builtin/default.yaml→readability.yaml" in guideline_sets
-        assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
+        assert "builtin/default.yaml→code-quality.yaml" in guideline_sets
 
     def test_load_builtin_default_display_name(self, manager):
         """Test that display name format is correct."""
@@ -254,8 +252,7 @@ class TestLoadingBuiltinDefault:
 
         # Display names should follow parent→child format
         assert "builtin/default.yaml→security.yaml" in guideline_sets
-        assert "builtin/default.yaml→readability.yaml" in guideline_sets
-        assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
+        assert "builtin/default.yaml→code-quality.yaml" in guideline_sets
 
 
 class TestDuplicateIDDetection:
@@ -424,32 +421,32 @@ includes:
         file1 = codeyak_dir / "dup1.yaml"
         file1.write_text("""
 includes:
-  - builtin:readability
+  - builtin:code-quality
         """)
 
         file2 = codeyak_dir / "dup2.yaml"
         file2.write_text("""
 includes:
-  - builtin:readability
+  - builtin:code-quality
         """)
 
         with pytest.raises(GuidelineIncludeError) as exc_info:
             manager._load_project_guidelines([file1, file2])
 
         error_msg = str(exc_info.value)
-        # Exact error message check - references the builtin readability.yaml file
+        # Exact error message check - references the builtin code-quality.yaml file
         assert error_msg.startswith("Circular include detected:")
-        assert "readability.yaml" in error_msg
+        assert "code-quality.yaml" in error_msg
 
         # Scenario 4: File where local guideline conflicts with include → Should fail
-        conflict_file = codeyak_dir / "readability.yaml"
+        conflict_file = codeyak_dir / "code-quality.yaml"
         conflict_file.write_text("""
 includes:
-  - builtin:readability
+  - builtin:code-quality
 
 guidelines:
-  - label: function-length
-    description: Conflicts with builtin readability/function-length
+  - label: single-responsibility
+    description: Conflicts with builtin code-quality/single-responsibility
         """)
 
         with pytest.raises(GuidelinesLoadError) as exc_info:
@@ -457,7 +454,7 @@ guidelines:
 
         error_msg = str(exc_info.value)
         # Exact error message check - duplicate ID detected
-        assert "Duplicate guideline ID 'readability/function-length' found in project/readability.yaml" in error_msg
+        assert "Duplicate guideline ID 'code-quality/single-responsibility' found in project/code-quality.yaml" in error_msg
         assert "IDs must be unique across all guideline files" in error_msg
 
 
@@ -561,10 +558,9 @@ guidelines:
             guideline_sets = manager.load_guideline_sets()
 
             # Should load builtin default as separate sets
-            assert len(guideline_sets) == 3
+            assert len(guideline_sets) == 2
             assert "builtin/default.yaml→security.yaml" in guideline_sets
-            assert "builtin/default.yaml→readability.yaml" in guideline_sets
-            assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
+            assert "builtin/default.yaml→code-quality.yaml" in guideline_sets
 
     def test_load_validates_guideline_sets(self, manager, temp_project_dir, monkeypatch, mocker):
         """Test that validation is called during loading."""
@@ -646,11 +642,10 @@ guidelines:
 
             guideline_sets = manager.load_guideline_sets()
 
-            # Should have builtin default as 3 separate sets
-            assert len(guideline_sets) == 3
+            # Should have builtin default as 2 separate sets
+            assert len(guideline_sets) == 2
             assert "builtin/default.yaml→security.yaml" in guideline_sets
-            assert "builtin/default.yaml→readability.yaml" in guideline_sets
-            assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
+            assert "builtin/default.yaml→code-quality.yaml" in guideline_sets
 
             # Each set should have guidelines
             for set_name, guidelines in guideline_sets.items():
@@ -697,3 +692,238 @@ guidelines:
 
         with pytest.raises(GuidelinesLoadError, match="Invalid guidelines format"):
             manager.load_guideline_sets()
+
+
+class TestVCSFetching:
+    """Tests for fetching guidelines from VCS."""
+
+    def test_fetch_yaml_files_from_vcs_success(self, manager):
+        """Test successfully fetching YAML files from VCS."""
+        from unittest.mock import Mock
+
+        # Mock VCS client
+        mock_vcs = Mock()
+        mock_vcs.get_codeyak_files.return_value = {
+            "security.yaml": """guidelines:
+  - label: test-security
+    description: Test security guideline""",
+            "style.yaml": """guidelines:
+  - label: test-style
+    description: Test style guideline"""
+        }
+
+        # Execute
+        yaml_files = manager._fetch_yaml_files_from_vcs(mock_vcs, "123")
+
+        # Assert
+        assert len(yaml_files) == 2
+        assert all(f.suffix in [".yaml", ".yml"] for f in yaml_files)
+        assert any("security.yaml" in str(f) for f in yaml_files)
+        assert any("style.yaml" in str(f) for f in yaml_files)
+
+        # Verify files have correct content
+        security_file = next(f for f in yaml_files if "security.yaml" in str(f))
+        content = security_file.read_text()
+        assert "test-security" in content
+
+    def test_fetch_yaml_files_from_vcs_empty(self, manager):
+        """Test VCS returns no files."""
+        from unittest.mock import Mock
+
+        mock_vcs = Mock()
+        mock_vcs.get_codeyak_files.return_value = {}
+
+        yaml_files = manager._fetch_yaml_files_from_vcs(mock_vcs, "123")
+
+        assert yaml_files == []
+
+    def test_fetch_yaml_files_from_vcs_error(self, manager):
+        """Test VCS fetch error is handled gracefully."""
+        from unittest.mock import Mock
+
+        mock_vcs = Mock()
+        mock_vcs.get_codeyak_files.side_effect = Exception("VCS error")
+
+        # Should not raise, just return empty list
+        yaml_files = manager._fetch_yaml_files_from_vcs(mock_vcs, "123")
+
+        assert yaml_files == []
+
+    def test_load_guideline_sets_with_vcs_files(self, manager, monkeypatch):
+        """Test loading guidelines when VCS has .codeyak files."""
+        from unittest.mock import Mock
+
+        # Change to empty directory (no local .codeyak/)
+        with tempfile.TemporaryDirectory() as tmpdir:
+            monkeypatch.chdir(tmpdir)
+
+            # Mock VCS with guidelines
+            mock_vcs = Mock()
+            mock_vcs.get_codeyak_files.return_value = {
+                "test.yaml": """guidelines:
+  - label: vcs-guideline
+    description: Guideline from VCS"""
+            }
+
+            # Execute
+            guideline_sets = manager.load_guideline_sets(vcs=mock_vcs, mr_id="123")
+
+            # Assert - should load from VCS, not builtin default
+            assert len(guideline_sets) == 1
+            assert "project/test.yaml" in guideline_sets
+            assert len(guideline_sets["project/test.yaml"]) == 1
+            assert guideline_sets["project/test.yaml"][0].id == "test/vcs-guideline"
+
+    def test_load_guideline_sets_vcs_falls_back_to_local(self, manager, temp_project_dir, monkeypatch):
+        """Test that if VCS returns no files, it falls back to local .codeyak/."""
+        from unittest.mock import Mock
+
+        monkeypatch.chdir(temp_project_dir)
+        codeyak_dir = temp_project_dir / ".codeyak"
+
+        # Create local file
+        (codeyak_dir / "local.yaml").write_text("""guidelines:
+  - label: local-guideline
+    description: Local guideline""")
+
+        # Mock VCS that returns empty
+        mock_vcs = Mock()
+        mock_vcs.get_codeyak_files.return_value = {}
+
+        # Execute
+        guideline_sets = manager.load_guideline_sets(vcs=mock_vcs, mr_id="123")
+
+        # Assert - should load from local, not VCS
+        assert len(guideline_sets) == 1
+        assert "project/local.yaml" in guideline_sets
+        assert guideline_sets["project/local.yaml"][0].id == "local/local-guideline"
+
+    def test_load_guideline_sets_vcs_preferred_over_local(self, manager, temp_project_dir, monkeypatch):
+        """Test that VCS files are preferred over local files."""
+        from unittest.mock import Mock
+
+        monkeypatch.chdir(temp_project_dir)
+        codeyak_dir = temp_project_dir / ".codeyak"
+
+        # Create local file
+        (codeyak_dir / "local.yaml").write_text("""guidelines:
+  - label: local-guideline
+    description: Should not be used""")
+
+        # Mock VCS that returns files
+        mock_vcs = Mock()
+        mock_vcs.get_codeyak_files.return_value = {
+            "vcs.yaml": """guidelines:
+  - label: vcs-guideline
+    description: Should be used"""
+        }
+
+        # Execute
+        guideline_sets = manager.load_guideline_sets(vcs=mock_vcs, mr_id="123")
+
+        # Assert - should load from VCS, not local
+        assert len(guideline_sets) == 1
+        assert "project/vcs.yaml" in guideline_sets
+        assert "project/local.yaml" not in guideline_sets
+        assert guideline_sets["project/vcs.yaml"][0].id == "vcs/vcs-guideline"
+
+    def test_load_guideline_sets_without_vcs_uses_local(self, manager, temp_project_dir, monkeypatch):
+        """Test that without VCS parameter, local files are used."""
+        monkeypatch.chdir(temp_project_dir)
+        codeyak_dir = temp_project_dir / ".codeyak"
+
+        # Create local file
+        (codeyak_dir / "local.yaml").write_text("""guidelines:
+  - label: local-guideline
+    description: Local guideline""")
+
+        # Execute without VCS
+        guideline_sets = manager.load_guideline_sets()
+
+        # Assert
+        assert len(guideline_sets) == 1
+        assert "project/local.yaml" in guideline_sets
+
+    def test_load_guideline_sets_vcs_with_includes(self, manager, monkeypatch):
+        """Test loading VCS files that include built-in guidelines."""
+        from unittest.mock import Mock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            monkeypatch.chdir(tmpdir)
+
+            # Mock VCS with file that includes builtin guidelines
+            mock_vcs = Mock()
+            mock_vcs.get_codeyak_files.return_value = {
+                "custom.yaml": """includes:
+  - builtin:security
+
+guidelines:
+  - label: custom-rule
+    description: Custom rule"""
+            }
+
+            # Execute
+            guideline_sets = manager.load_guideline_sets(vcs=mock_vcs, mr_id="123")
+
+            # Assert - should have both included and local guidelines
+            assert len(guideline_sets) == 2
+            assert "project/custom.yaml→security.yaml" in guideline_sets
+            assert "project/custom.yaml" in guideline_sets
+
+            # Security guidelines
+            security_guidelines = guideline_sets["project/custom.yaml→security.yaml"]
+            assert len(security_guidelines) > 0
+            assert all(g.id.startswith("security/") for g in security_guidelines)
+
+            # Custom guidelines
+            custom_guidelines = guideline_sets["project/custom.yaml"]
+            assert len(custom_guidelines) == 1
+            assert custom_guidelines[0].id == "custom/custom-rule"
+
+    def test_load_guideline_sets_vcs_falls_back_to_builtin(self, manager, monkeypatch):
+        """Test that if VCS returns no files and no local files exist, builtin default is loaded."""
+        from unittest.mock import Mock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            monkeypatch.chdir(tmpdir)
+
+            # Mock VCS that returns empty
+            mock_vcs = Mock()
+            mock_vcs.get_codeyak_files.return_value = {}
+
+            # Execute - no VCS files, no local files
+            guideline_sets = manager.load_guideline_sets(vcs=mock_vcs, mr_id="123")
+
+            # Assert - should load builtin default
+            assert len(guideline_sets) > 0
+            assert any("builtin/default.yaml" in name for name in guideline_sets.keys())
+
+    def test_load_guideline_sets_vcs_multiple_files(self, manager, monkeypatch):
+        """Test loading multiple files from VCS."""
+        from unittest.mock import Mock
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            monkeypatch.chdir(tmpdir)
+
+            # Mock VCS with multiple files
+            mock_vcs = Mock()
+            mock_vcs.get_codeyak_files.return_value = {
+                "01-security.yaml": """guidelines:
+  - label: security-rule
+    description: Security rule""",
+                "02-style.yaml": """guidelines:
+  - label: style-rule
+    description: Style rule""",
+                "03-custom.yaml": """guidelines:
+  - label: custom-rule
+    description: Custom rule"""
+            }
+
+            # Execute
+            guideline_sets = manager.load_guideline_sets(vcs=mock_vcs, mr_id="123")
+
+            # Assert
+            assert len(guideline_sets) == 3
+            assert "project/01-security.yaml" in guideline_sets
+            assert "project/02-style.yaml" in guideline_sets
+            assert "project/03-custom.yaml" in guideline_sets

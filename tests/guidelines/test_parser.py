@@ -545,7 +545,7 @@ class TestBuiltinResolution:
         # Should have at least the default built-ins
         assert len(builtins) > 0
         # Check that some expected builtins exist
-        expected_builtins = ["default", "security", "readability", "maintainability"]
+        expected_builtins = ["default", "security", "code-quality"]
         for expected in expected_builtins:
             assert expected in builtins, f"Expected builtin '{expected}' not found"
 
