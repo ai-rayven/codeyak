@@ -92,21 +92,29 @@ class ReviewEngine:
 
     def _process_results(self, mr_id: str, result: ReviewResult) -> int:
         """Iterates through findings and posts them to the VCS. Returns count of violations."""
+        posted_count = 0
         for violation in result.violations:
-            print(f"     found {violation.guideline_id} in {violation.file_path}")
+            # Filter low-confidence violations
+            if violation.confidence == "low" or violation.confidence == "medium":
+                print(f"     ⚠️  Skipping {violation.confidence}-confidence: {violation.guideline_id} in {violation.file_path}")
+                continue
+
+            print(f"     found {violation.guideline_id} in {violation.file_path} (confidence: {violation.confidence})")
             try:
                 self.vcs.post_comment(mr_id, violation)
+                posted_count += 1
             except LineNotInDiffError:
                 # Line not in diff - post as general comment instead
                 try:
                     self.vcs.post_general_comment(mr_id, violation.to_general_comment())
                     print(f"⚠️  Posted as general comment (line not in diff): {violation.file_path}:{violation.line_number}")
+                    posted_count += 1
                 except VCSCommentError as e:
                     print(f"❌ Failed to post general comment: {e}")
             except VCSCommentError as e:
                 # Other VCS error - report it but continue
                 print(f"❌ Failed to post comment: {e}")
-        return len(result.violations)
+        return posted_count
 
     def _filter_existing_violations(
         self,

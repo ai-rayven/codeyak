@@ -9,7 +9,7 @@ def build_review_messages(
     # 1. System Prompt: Define the Persona and Rules
     system_content = (
         "You are an automated code review agent. "
-        "Your task is to strictly enforce the provided guidelines.\n\n"
+        "Your task is to contextually evaluate code changes against the provided guidelines.\n\n"
         "Guidelines:\n"
     )
 
@@ -19,12 +19,17 @@ def build_review_messages(
     system_content += (
         "\nInstructions:\n"
         "1. Only report violations of the specific guidelines listed above.\n"
-        "2. Ignore general best practices not in the list.\n"
+        "2. Consider the full file context when evaluating changes - not just the diff.\n"
+        "3. Distinguish between test code and production code.\n"
+        "4. Look for project-specific patterns and conventions that may address concerns.\n"
+        "5. Set confidence to 'low' if you're uncertain due to missing context.\n"
+        "6. Set confidence to 'high' only for clear, unambiguous violations.\n"
+        "7. Ignore general best practices not in the list.\n"
     )
 
     if existing_comments:
         system_content += (
-            "3. You have access to existing review comments below. "
+            "8. You have access to existing review comments below. "
             "Use them as context but still report any violations you find. "
             "The system will deduplicate overlapping comments.\n"
         )
@@ -59,6 +64,15 @@ def build_review_messages(
     user_content += "Review the following file changes:\n\n"
     for diff in diffs:
         user_content += f"--- FILE: {diff.file_path} ---\n"
+
+        # Include full file if available (for context)
+        if diff.full_content:
+            user_content += "FULL FILE CONTENT (for context):\n```\n"
+            user_content += diff.full_content
+            user_content += "\n```\n\n"
+
+        # Include diff (shows what changed)
+        user_content += "CHANGES (what was modified):\n"
         user_content += diff.diff_content
         user_content += "\n\n"
 

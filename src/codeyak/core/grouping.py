@@ -1,8 +1,7 @@
 from typing import List
 from .models import FileDiff, FileGroup
 
-# 12,000 tokens * 3.5 chars/token = ~42,000 chars
-MAX_CHARS_PER_GROUP = 42000 
+MAX_CHARS_PER_GROUP = 450000 
 TOKEN_TO_CHAR_ESTIMATE = 3.5
 
 def create_file_groups(diffs: List[FileDiff]) -> List[FileGroup]:
@@ -15,7 +14,11 @@ def create_file_groups(diffs: List[FileDiff]) -> List[FileGroup]:
         # 1. Simple length check (File path + Content)
         # This works for ANY model (OpenAI, Anthropic, Mistral)
         content_len = len(diff.file_path) + len(diff.diff_content)
-        
+
+        # Add full file content if present
+        if diff.full_content:
+            content_len += len(diff.full_content)
+
         # Store for debugging (no longer called 'tokens')
         diff.tokens = int(content_len / TOKEN_TO_CHAR_ESTIMATE) 
 

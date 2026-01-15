@@ -43,6 +43,20 @@ class VCSClient(ABC):
         """
         pass
 
+    @abstractmethod
+    def get_file_content(self, mr_id: str, file_path: str) -> Any:
+        """
+        Fetch the full content of a file from the MR's source branch.
+
+        Args:
+            mr_id: Merge request ID
+            file_path: Path to the file
+
+        Returns:
+            File content as string, or None if file doesn't exist (e.g., newly added file)
+        """
+        pass
+
 class LLMClient(ABC):
     @abstractmethod
     def generate(self, messages: List[dict], response_model: Type[T]) -> T:

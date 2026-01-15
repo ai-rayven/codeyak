@@ -20,22 +20,28 @@ class GitLabAdapter(VCSClient):
 
     def get_diff(self, mr_id: str) -> List[FileDiff]:
         mr = self._get_mr(mr_id)
-        
-        # 'changes()' fetches the diffs. 
+
+        # 'changes()' fetches the diffs.
         # access_raw_diffs=True is vital for large files.
         changes = mr.changes(access_raw_diffs=True)
-        
+
         diffs = []
         for change in changes['changes']:
             # Skip deleted files
             if change['deleted_file']:
                 continue
-                
+
+            file_path = change['new_path']
+
+            # Fetch full file content for context
+            full_content = self.get_file_content(mr_id, file_path)
+
             diffs.append(FileDiff(
-                file_path=change['new_path'],
+                file_path=file_path,
                 diff_content=change['diff'],
+                full_content=full_content
             ))
-            
+
         return diffs
 
     def post_comment(self, mr_id: str, violation: GuidelineViolation) -> None:
@@ -199,6 +205,42 @@ class GitLabAdapter(VCSClient):
             raise VCSFetchCommentsError(f"Failed to fetch comments: {e}") from e
         except Exception as e:
             raise VCSFetchCommentsError(f"Unexpected error fetching comments: {e}") from e
+
+    def get_file_content(self, mr_id: str, file_path: str) -> Optional[str]:
+        """
+        Fetch the full content of a file from the MR's source branch.
+
+        Args:
+            mr_id: Merge request ID
+            file_path: Path to the file
+
+        Returns:
+            File content as string, or None if file doesn't exist (e.g., newly added file)
+
+        Raises:
+            VCSCommentError: When fetching fails for reasons other than 404
+        """
+        mr = self._get_mr(mr_id)
+        source_branch = mr.source_branch
+
+        try:
+            # Fetch file from source branch
+            file = self.project.files.get(
+                file_path=file_path,
+                ref=source_branch
+            )
+
+            # Decode content (base64 encoded by default)
+            content = file.decode().decode('utf-8')
+            return content
+
+        except gitlab.exceptions.GitlabGetError as e:
+            if e.response_code == 404:
+                # File is new (added in this MR)
+                return None
+            raise VCSCommentError(f"Failed to fetch file {file_path}: {e}") from e
+        except Exception as e:
+            raise VCSCommentError(f"Unexpected error fetching file {file_path}: {e}") from e
 
     def get_codeyak_files(self, mr_id: str) -> Dict[str, str]:
         """

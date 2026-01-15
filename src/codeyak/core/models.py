@@ -13,6 +13,7 @@ class FileDiff(BaseModel):
     """
     file_path: str
     diff_content: str
+    full_content: Optional[str] = None  # Full file content for context
 
     # Simple token count for grouping (no logic needed yet)
     tokens: int = 0
@@ -110,6 +111,10 @@ class GuidelineViolation(BaseModel):
     line_number: int
     guideline_id: str = Field(..., description="MUST match the ID of the provided Guideline.")
     reasoning: str = Field(..., description="Brief explanation of why this code violates the rule.")
+    confidence: str = Field(
+        default="medium",
+        description="Confidence level: 'low', 'medium', or 'high'. Use 'low' when context is unclear."
+    )
 
     def to_comment(self) -> str:
         """Formats the output for GitLab inline comments"""
