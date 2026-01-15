@@ -1,5 +1,5 @@
 import gitlab
-from typing import List
+from typing import List, Optional, Dict
 from gitlab.v4.objects import ProjectMergeRequest
 
 from ...core.ports import VCSClient
@@ -199,3 +199,47 @@ class GitLabAdapter(VCSClient):
             raise VCSFetchCommentsError(f"Failed to fetch comments: {e}") from e
         except Exception as e:
             raise VCSFetchCommentsError(f"Unexpected error fetching comments: {e}") from e
+
+    def get_codeyak_files(self, mr_id: str) -> Dict[str, str]:
+        """
+        Fetch YAML files from .codeyak/ directory in the MR's source branch.
+
+        Returns:
+            Dict[str, str]: Map of filename to file content
+        """
+        mr = self._get_mr(mr_id)
+        source_branch = mr.source_branch
+
+        try:
+            # List files in .codeyak/ directory
+            items = self.project.repository_tree(
+                path='.codeyak',
+                ref=source_branch,
+                get_all=True
+            )
+
+            yaml_files = {}
+            for item in items:
+                # Only process YAML files (not subdirectories)
+                if item['type'] == 'blob' and (item['name'].endswith('.yaml') or item['name'].endswith('.yml')):
+                    file_path = f".codeyak/{item['name']}"
+
+                    # Fetch file content
+                    file_content = self.project.files.get(
+                        file_path=file_path,
+                        ref=source_branch
+                    )
+
+                    # Decode content (base64 encoded by default)
+                    content = file_content.decode().decode('utf-8')
+                    yaml_files[item['name']] = content
+
+            return yaml_files
+
+        except gitlab.exceptions.GitlabGetError as e:
+            # .codeyak directory doesn't exist or is not accessible
+            if e.response_code == 404:
+                return {}
+            raise VCSFetchCommentsError(f"Failed to fetch .codeyak files: {e}") from e
+        except Exception as e:
+            raise VCSFetchCommentsError(f"Unexpected error fetching .codeyak files: {e}") from e

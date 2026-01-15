@@ -43,8 +43,11 @@ class ReviewEngine:
         groups = create_file_groups(diffs)
         print(f"Split {len(diffs)} files into {len(groups)} analysis groups.")
 
-        # 3. Load guideline sets (one per file)
-        guideline_sets = self.guidelines_manager.load_guideline_sets()
+        # 3. Load guideline sets (one per file, from VCS or local)
+        guideline_sets = self.guidelines_manager.load_guideline_sets(
+            vcs=self.vcs,
+            mr_id=mr_id
+        )
 
         # 4. Run focused review for each guideline set
         total_original_violations = 0

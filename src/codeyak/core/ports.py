@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import List, Type, TypeVar, Any
+from typing import List, Type, TypeVar, Any, Dict
 from pydantic import BaseModel
 from .models import FileDiff, GuidelineViolation, MRComment
 
@@ -30,6 +30,16 @@ class VCSClient(ABC):
 
         Raises:
             VCSFetchCommentsError: When fetching comments fails
+        """
+        pass
+
+    @abstractmethod
+    def get_codeyak_files(self, mr_id: str) -> Dict[str, str]:
+        """
+        Fetch YAML files from .codeyak/ directory in the MR's source branch.
+
+        Returns:
+            Dict[str, str]: Map of filename to file content. Empty dict if no .codeyak/ directory.
         """
         pass
 

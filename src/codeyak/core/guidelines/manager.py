@@ -5,12 +5,16 @@ Handles loading, parsing, and validating guideline sets from both
 built-in and project-specific sources.
 """
 
-from typing import List, Dict
+from typing import List, Dict, Optional, TYPE_CHECKING
 from pathlib import Path
 import yaml
+import tempfile
 from .models import Guideline
 from .exceptions import GuidelinesLoadError, GuidelineIncludeError
 from .parser import GuidelinesParser
+
+if TYPE_CHECKING:
+    from ..ports import VCSClient
 
 
 class GuidelinesManager:
@@ -27,18 +31,24 @@ class GuidelinesManager:
         """Initialize the guidelines manager with a parser instance."""
         self.parser = GuidelinesParser()
 
-    def load_guideline_sets(self) -> Dict[str, List[Guideline]]:
+    def load_guideline_sets(
+        self,
+        vcs: Optional['VCSClient'] = None,
+        mr_id: Optional[str] = None
+    ) -> Dict[str, List[Guideline]]:
         """
         Load guideline sets from built-in and project-specific sources.
 
         Loading strategy:
-        1. If .codeyak/ directory exists with YAML files:
-           - Load all project-specific YAML files
-           - Process any 'includes' directives in those files
-        2. If .codeyak/ directory doesn't exist or is empty:
-           - Auto-load built-in 'default' guideline set
+        1. If vcs and mr_id provided, try to fetch .codeyak/ files from repository
+        2. If no VCS files found, check local .codeyak/ directory
+        3. If no project files found, auto-load built-in 'default' guideline set
 
         Each guideline set (file) becomes a separate review pass.
+
+        Args:
+            vcs: Optional VCS client to fetch files from repository
+            mr_id: Optional merge request ID to fetch files from
 
         Returns:
             Dict[str, List[Guideline]]: Map of display name to list of guidelines
@@ -47,7 +57,14 @@ class GuidelinesManager:
         Raises:
             GuidelinesLoadError: If files are invalid or includes cannot be resolved
         """
-        project_yaml_files = self._scan_project_yaml_files()
+        # Try to fetch from VCS first (if in CI/CD context)
+        project_yaml_files = []
+        if vcs and mr_id:
+            project_yaml_files = self._fetch_yaml_files_from_vcs(vcs, mr_id)
+
+        # Fall back to local filesystem (for local development)
+        if not project_yaml_files:
+            project_yaml_files = self._scan_project_yaml_files()
 
         if project_yaml_files:
             guideline_sets = self._load_project_guidelines(project_yaml_files)
@@ -77,6 +94,44 @@ class GuidelinesManager:
         )
 
         return yaml_files
+
+    def _fetch_yaml_files_from_vcs(self, vcs: 'VCSClient', mr_id: str) -> List[Path]:
+        """
+        Fetch YAML files from repository's .codeyak/ directory via VCS.
+
+        Creates temporary files for each YAML file fetched from the repository.
+
+        Args:
+            vcs: VCS client to fetch files from
+            mr_id: Merge request ID
+
+        Returns:
+            List[Path]: List of temporary file paths containing YAML content
+        """
+        try:
+            # Fetch .codeyak files from repository
+            yaml_files_content = vcs.get_codeyak_files(mr_id)
+
+            if not yaml_files_content:
+                return []
+
+            print(f"📦 Found {len(yaml_files_content)} .codeyak file(s) in repository")
+
+            # Create temporary directory for storing fetched files
+            temp_dir = Path(tempfile.mkdtemp(prefix="codeyak_"))
+            temp_files = []
+
+            for filename, content in sorted(yaml_files_content.items()):
+                temp_file = temp_dir / filename
+                temp_file.write_text(content)
+                temp_files.append(temp_file)
+                print(f"  📄 {filename}")
+
+            return temp_files
+
+        except Exception as e:
+            print(f"⚠️  Failed to fetch .codeyak files from repository: {e}")
+            return []
 
     def _process_guideline_file_with_includes(
         self,
