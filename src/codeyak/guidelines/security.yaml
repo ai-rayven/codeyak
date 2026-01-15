@@ -15,7 +15,7 @@ guidelines:
 
   # Input Validation & Injection Prevention
   - label: input-validation
-    description: Always validate and sanitize user input to prevent injection attacks (SQL, command, LDAP, etc).
+    description: Always validate and sanitize user input to prevent injection attacks, including LDAP, XML, and other injection types not covered by specific guidelines.
 
   - label: sql-injection
     description: Use parameterized queries or ORM methods to prevent SQL injection. Never concatenate user input into queries.

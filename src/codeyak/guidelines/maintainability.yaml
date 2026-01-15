@@ -11,7 +11,7 @@ guidelines:
     description: Reduce cyclomatic complexity. Break down complex conditional logic into smaller functions.
 
   - label: separation-of-concerns
-    description: Maintain clear separation of concerns. Avoid God services that handle too many responsibilities.
+    description: Maintain clear separation of concerns. Avoid God services or God classes that handle too many unrelated responsibilities.
 
   # Code Organization
   - label: logical-organization
