@@ -9,7 +9,7 @@ from typing import List, Dict
 from pathlib import Path
 import yaml
 from .models import Guideline
-from .exceptions import GuidelinesLoadError
+from .exceptions import GuidelinesLoadError, GuidelineIncludeError
 from .parser import GuidelinesParser
 
 
@@ -78,9 +78,94 @@ class GuidelinesManager:
 
         return yaml_files
 
+    def _process_guideline_file_with_includes(
+        self,
+        yaml_file: Path,
+        display_prefix: str,
+        all_seen_ids: set,
+        processed_files: set
+    ) -> Dict[str, List[Guideline]]:
+        """
+        Process a guideline file and its includes as separate sets.
+
+        Each included file becomes a separate guideline set. Local guidelines
+        (if any) also become a separate set.
+
+        Args:
+            yaml_file: Path to YAML file to process
+            display_prefix: Prefix for display names ("project" or "builtin")
+            all_seen_ids: Set of already seen guideline IDs (for duplicate detection)
+            processed_files: Set of already processed files (for circular detection)
+
+        Returns:
+            Dict mapping display names to guideline lists
+
+        Raises:
+            GuidelinesLoadError: If files are invalid or have duplicate IDs
+            GuidelineIncludeError: If circular includes detected
+        """
+        guideline_sets = {}
+
+        print(f"Loading {yaml_file.name}...")
+
+        # Parse file with metadata (extracts includes without merging)
+        file_info = self.parser.parse_file_with_metadata(
+            yaml_file,
+            processed_files=processed_files
+        )
+
+        # Process each include as a separate guideline set
+        for include_path in file_info.included_files:
+            if include_path in processed_files:
+                raise GuidelineIncludeError(
+                    f"Circular include detected: {include_path}"
+                )
+
+            # Parse included file separately (no nested includes)
+            included_guidelines = self.parser.parse_file(
+                include_path,
+                allow_includes=False,
+                processed_files=processed_files
+            )
+
+            # Create display name showing parent→child relationship
+            display_name = f"{display_prefix}/{yaml_file.name}→{include_path.name}"
+
+            # Check for duplicate IDs
+            self._check_duplicate_ids(
+                included_guidelines,
+                all_seen_ids,
+                display_name
+            )
+
+            # Store as separate set
+            guideline_sets[display_name] = included_guidelines
+            print(f"  ✅ Loaded {len(included_guidelines)} guidelines from {display_name}")
+
+        # Add local guidelines as separate set (if any)
+        if file_info.has_local_guidelines:
+            display_name = f"{display_prefix}/{yaml_file.name}"
+
+            # Check for duplicate IDs
+            self._check_duplicate_ids(
+                file_info.local_guidelines,
+                all_seen_ids,
+                display_name
+            )
+
+            # Store as separate set
+            guideline_sets[display_name] = file_info.local_guidelines
+            print(f"  ✅ Loaded {len(file_info.local_guidelines)} guidelines from {display_name}")
+
+        return guideline_sets
+
     def _load_project_guidelines(self, yaml_files: List[Path]) -> Dict[str, List[Guideline]]:
         """
         Load guidelines from project-specific YAML files.
+
+        Each included file becomes a separate guideline set with display name
+        "project/{parent}→{included}". Local guidelines (if any) become a separate
+        set with display name "project/{filename}".
 
         Args:
             yaml_files: List of YAML file paths to load
@@ -96,21 +181,18 @@ class GuidelinesManager:
 
         guideline_sets = {}
         all_seen_ids = set()
+        processed_files = set()
 
         for yaml_file in yaml_files:
             try:
-                print(f"Loading {yaml_file.name}...")
-
-                # Parse file (includes are processed automatically)
-                file_guidelines = self.parser.parse_file(yaml_file)
-
-                # Check for duplicate IDs across all files
-                self._check_duplicate_ids(file_guidelines, all_seen_ids, yaml_file.name)
-
-                # Store with descriptive name
-                display_name = f"project/{yaml_file.name}"
-                guideline_sets[display_name] = file_guidelines
-                print(f"  ✅ Loaded {len(file_guidelines)} guidelines from {yaml_file.name}")
+                # Use extracted method with "project" prefix
+                file_sets = self._process_guideline_file_with_includes(
+                    yaml_file,
+                    display_prefix="project",
+                    all_seen_ids=all_seen_ids,
+                    processed_files=processed_files
+                )
+                guideline_sets.update(file_sets)
 
             except GuidelinesLoadError:
                 # Re-raise our own exceptions without wrapping
@@ -123,6 +205,10 @@ class GuidelinesManager:
                 raise GuidelinesLoadError(
                     f"Invalid guidelines format in {yaml_file.name}: {e}"
                 ) from e
+            except GuidelineIncludeError as e:
+                raise GuidelinesLoadError(
+                    f"Include error in {yaml_file.name}: {e}"
+                ) from e
 
         return guideline_sets
 
@@ -130,8 +216,12 @@ class GuidelinesManager:
         """
         Load the built-in default guideline set.
 
+        Each included file becomes a separate guideline set with display name
+        "builtin/default.yaml→{included}". Local guidelines (if any) become a separate
+        set with display name "builtin/default.yaml".
+
         Returns:
-            Dict with single entry containing default guidelines
+            Dict mapping display names to guideline lists
 
         Raises:
             GuidelinesLoadError: If default guideline set not found
@@ -153,16 +243,18 @@ class GuidelinesManager:
                     "Package may be incorrectly installed."
                 )
 
-            # Parse default guidelines (includes are now supported)
-            file_guidelines = self.parser.parse_file(
+            all_seen_ids = set()
+            processed_files = set()
+
+            # Use extracted method with "builtin" prefix
+            guideline_sets = self._process_guideline_file_with_includes(
                 default_yaml,
-                allow_includes=True
+                display_prefix="builtin",
+                all_seen_ids=all_seen_ids,
+                processed_files=processed_files
             )
 
-            display_name = "builtin/default.yaml"
-            print(f"  ✅ Loaded {len(file_guidelines)} guidelines from built-in default set")
-
-            return {display_name: file_guidelines}
+            return guideline_sets
 
         except GuidelinesLoadError:
             # Re-raise our own exceptions without wrapping
@@ -174,6 +266,10 @@ class GuidelinesManager:
         except ValueError as e:
             raise GuidelinesLoadError(
                 f"Invalid format in built-in default guidelines: {e}"
+            ) from e
+        except GuidelineIncludeError as e:
+            raise GuidelinesLoadError(
+                f"Include error in built-in default guidelines: {e}"
             ) from e
 
     def _check_duplicate_ids(

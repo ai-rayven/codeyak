@@ -54,7 +54,7 @@ class TestBasicParsing:
 
     def test_parse_multiple_guidelines(self, parser):
         """Test parsing file with multiple guidelines."""
-        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', delete=False) as f:
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.yaml', prefix='test-', delete=False) as f:
             f.write("""
 guidelines:
   - label: rule-1

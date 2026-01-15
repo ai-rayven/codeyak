@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from codeyak.core.guidelines.exceptions import GuidelinesLoadError
+from codeyak.core.guidelines.exceptions import GuidelinesLoadError, GuidelineIncludeError
 from codeyak.core.guidelines.manager import GuidelinesManager
 from codeyak.core.guidelines.models import Guideline
 
@@ -159,12 +159,20 @@ guidelines:
         yaml_files = [yaml_file]
         guideline_sets = manager._load_project_guidelines(yaml_files)
 
+        # Should have 2 separate sets: one for included security.yaml, one for local guidelines
+        assert len(guideline_sets) == 2
+        assert "project/with-includes.yaml→security.yaml" in guideline_sets
         assert "project/with-includes.yaml" in guideline_sets
-        # Should have custom rule + security guidelines
-        guidelines = guideline_sets["project/with-includes.yaml"]
-        assert len(guidelines) > 1
-        custom_rules = [g for g in guidelines if "custom-rule" in g.id]
-        assert len(custom_rules) == 1
+
+        # Security guidelines should be in the included set
+        security_guidelines = guideline_sets["project/with-includes.yaml→security.yaml"]
+        assert len(security_guidelines) > 0
+        assert all("security/" in g.id for g in security_guidelines)
+
+        # Local guidelines should be in the main set
+        local_guidelines = guideline_sets["project/with-includes.yaml"]
+        assert len(local_guidelines) == 1
+        assert local_guidelines[0].id == "with-includes/custom-rule"
 
     def test_load_project_guidelines_yaml_error(self, manager, temp_project_dir, monkeypatch):
         """Test that YAML syntax errors are wrapped in GuidelinesLoadError."""
@@ -218,24 +226,36 @@ class TestLoadingBuiltinDefault:
         """Test successfully loading built-in default guidelines."""
         guideline_sets = manager._load_builtin_default()
 
-        assert len(guideline_sets) == 1
-        assert "builtin/default.yaml" in guideline_sets
-        # Default should have guidelines (from includes or direct)
-        assert len(guideline_sets["builtin/default.yaml"]) > 0
+        # Default.yaml has 3 includes (security, readability, maintainability) and no local guidelines
+        assert len(guideline_sets) == 3
+        assert "builtin/default.yaml→security.yaml" in guideline_sets
+        assert "builtin/default.yaml→readability.yaml" in guideline_sets
+        assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
+
+        # Each set should have guidelines
+        for set_name, guidelines in guideline_sets.items():
+            assert len(guidelines) > 0
 
     def test_load_builtin_default_with_includes(self, manager):
-        """Test that default.yaml with includes works."""
-        # This is implicitly tested in test_load_builtin_default_success
-        # since the actual default.yaml uses includes
+        """Test that default.yaml with includes creates separate sets."""
         guideline_sets = manager._load_builtin_default()
-        guidelines = guideline_sets["builtin/default.yaml"]
-        # Should have merged guidelines from includes
-        assert len(guidelines) > 0
+
+        # Should have 3 separate sets from includes
+        assert len(guideline_sets) == 3
+
+        # Each included file should be a separate set
+        assert "builtin/default.yaml→security.yaml" in guideline_sets
+        assert "builtin/default.yaml→readability.yaml" in guideline_sets
+        assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
 
     def test_load_builtin_default_display_name(self, manager):
         """Test that display name format is correct."""
         guideline_sets = manager._load_builtin_default()
-        assert "builtin/default.yaml" in guideline_sets
+
+        # Display names should follow parent→child format
+        assert "builtin/default.yaml→security.yaml" in guideline_sets
+        assert "builtin/default.yaml→readability.yaml" in guideline_sets
+        assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
 
 
 class TestDuplicateIDDetection:
@@ -307,6 +327,138 @@ guidelines:
         assert "test/rule" in error_msg
         assert "duplicate-file.yaml" in error_msg
         assert "unique" in error_msg.lower()
+
+    def test_duplicate_label_in_parent_and_included_file(self, manager, temp_project_dir, monkeypatch):
+        """Test that duplicate IDs between parent file and its included file raise error."""
+        monkeypatch.chdir(temp_project_dir)
+        codeyak_dir = temp_project_dir / ".codeyak"
+
+        # Create a file named security.yaml that includes builtin:security
+        # This creates a conflict because both use "security/" prefix
+        yaml_file = codeyak_dir / "security.yaml"
+        yaml_file.write_text("""
+includes:
+  - builtin:security
+
+guidelines:
+  - label: sql-injection
+    description: Custom SQL injection rule that conflicts with builtin.
+        """)
+
+        yaml_files = [yaml_file]
+
+        # Should raise error because security/sql-injection appears in both:
+        # 1. project/security.yaml→security.yaml (from include)
+        # 2. project/security.yaml (local guideline)
+        with pytest.raises(GuidelinesLoadError) as exc_info:
+            manager._load_project_guidelines(yaml_files)
+
+        error_msg = str(exc_info.value)
+        # Exact error message check
+        assert "Duplicate guideline ID 'security/sql-injection' found in project/security.yaml" in error_msg
+        assert "IDs must be unique across all guideline files" in error_msg
+
+    def test_duplicate_across_multiple_files_with_same_include(self, manager, temp_project_dir, monkeypatch):
+        """Test that multiple files including the same builtin raise circular include error."""
+        monkeypatch.chdir(temp_project_dir)
+        codeyak_dir = temp_project_dir / ".codeyak"
+
+        # Create two files that both include builtin:security
+        file1 = codeyak_dir / "file1.yaml"
+        file1.write_text("""
+includes:
+  - builtin:security
+        """)
+
+        file2 = codeyak_dir / "file2.yaml"
+        file2.write_text("""
+includes:
+  - builtin:security
+        """)
+
+        yaml_files = [file1, file2]
+
+        # Should raise error because same include processed twice
+        # This is detected as "circular include" by the processed_files tracking
+        with pytest.raises(GuidelineIncludeError) as exc_info:
+            manager._load_project_guidelines(yaml_files)
+
+        error_msg = str(exc_info.value)
+        # Exact error message check - references the builtin security.yaml file
+        assert error_msg.startswith("Circular include detected:")
+        assert "security.yaml" in error_msg
+
+    def test_duplicate_detection_comprehensive(self, manager, temp_project_dir, monkeypatch):
+        """Comprehensive test for various duplicate detection scenarios."""
+        monkeypatch.chdir(temp_project_dir)
+        codeyak_dir = temp_project_dir / ".codeyak"
+
+        # Scenario 1: File with local guidelines only (no duplicates) → Should pass
+        solo_file = codeyak_dir / "solo.yaml"
+        solo_file.write_text("""
+guidelines:
+  - label: custom-rule
+    description: A standalone custom rule.
+        """)
+
+        # Should succeed
+        result = manager._load_project_guidelines([solo_file])
+        assert "project/solo.yaml" in result
+        assert len(result["project/solo.yaml"]) == 1
+
+        # Clean up for next scenario
+        (temp_project_dir / ".codeyak").mkdir(exist_ok=True)
+
+        # Scenario 2: File with includes only (no local guidelines) → Should pass
+        includes_only = codeyak_dir / "includes-only.yaml"
+        includes_only.write_text("""
+includes:
+  - builtin:security
+        """)
+
+        result = manager._load_project_guidelines([includes_only])
+        assert "project/includes-only.yaml→security.yaml" in result
+        assert len(result["project/includes-only.yaml→security.yaml"]) > 0
+
+        # Scenario 3: Two files with same include → Should fail with circular include error
+        file1 = codeyak_dir / "dup1.yaml"
+        file1.write_text("""
+includes:
+  - builtin:readability
+        """)
+
+        file2 = codeyak_dir / "dup2.yaml"
+        file2.write_text("""
+includes:
+  - builtin:readability
+        """)
+
+        with pytest.raises(GuidelineIncludeError) as exc_info:
+            manager._load_project_guidelines([file1, file2])
+
+        error_msg = str(exc_info.value)
+        # Exact error message check - references the builtin readability.yaml file
+        assert error_msg.startswith("Circular include detected:")
+        assert "readability.yaml" in error_msg
+
+        # Scenario 4: File where local guideline conflicts with include → Should fail
+        conflict_file = codeyak_dir / "readability.yaml"
+        conflict_file.write_text("""
+includes:
+  - builtin:readability
+
+guidelines:
+  - label: function-length
+    description: Conflicts with builtin readability/function-length
+        """)
+
+        with pytest.raises(GuidelinesLoadError) as exc_info:
+            manager._load_project_guidelines([conflict_file])
+
+        error_msg = str(exc_info.value)
+        # Exact error message check - duplicate ID detected
+        assert "Duplicate guideline ID 'readability/function-length' found in project/readability.yaml" in error_msg
+        assert "IDs must be unique across all guideline files" in error_msg
 
 
 class TestValidation:
@@ -408,8 +560,11 @@ guidelines:
 
             guideline_sets = manager.load_guideline_sets()
 
-            # Should load builtin default
-            assert "builtin/default.yaml" in guideline_sets
+            # Should load builtin default as separate sets
+            assert len(guideline_sets) == 3
+            assert "builtin/default.yaml→security.yaml" in guideline_sets
+            assert "builtin/default.yaml→readability.yaml" in guideline_sets
+            assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
 
     def test_load_validates_guideline_sets(self, manager, temp_project_dir, monkeypatch, mocker):
         """Test that validation is called during loading."""
@@ -491,10 +646,15 @@ guidelines:
 
             guideline_sets = manager.load_guideline_sets()
 
-            # Should have builtin default
-            assert len(guideline_sets) == 1
-            assert "builtin/default.yaml" in guideline_sets
-            assert len(guideline_sets["builtin/default.yaml"]) > 0
+            # Should have builtin default as 3 separate sets
+            assert len(guideline_sets) == 3
+            assert "builtin/default.yaml→security.yaml" in guideline_sets
+            assert "builtin/default.yaml→readability.yaml" in guideline_sets
+            assert "builtin/default.yaml→maintainability.yaml" in guideline_sets
+
+            # Each set should have guidelines
+            for set_name, guidelines in guideline_sets.items():
+                assert len(guidelines) > 0
 
 
 class TestExceptionHandling:

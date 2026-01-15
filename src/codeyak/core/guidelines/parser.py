@@ -9,7 +9,7 @@ from typing import List
 from pathlib import Path
 import re
 import yaml
-from .models import Guideline
+from .models import Guideline, GuidelineSetInfo
 from .exceptions import (
     GuidelinesLoadError,
     BuiltinGuidelineNotFoundError,
@@ -67,22 +67,8 @@ class GuidelinesParser:
 
         processed_files.add(path)
 
-        # Read and parse YAML
-        with open(path, 'r', encoding='utf-8') as f:
-            data = yaml.safe_load(f)
-
-        # Handle empty files
-        if data is None:
-            raise ValueError(
-                f"Guidelines file {path.name} is empty or contains only whitespace"
-            )
-
-        # Validate top-level structure
-        if not isinstance(data, dict):
-            raise ValueError(
-                f"Guidelines file must contain a YAML dictionary, "
-                f"but found {type(data).__name__} in {path.name}"
-            )
+        # Read and validate YAML structure
+        data = self._read_and_validate_yaml(path)
 
         all_guidelines = []
 
@@ -115,71 +101,11 @@ class GuidelinesParser:
                 # Extract prefix from filename
                 prefix = path.stem  # e.g., "security" from "security.yaml"
 
-                # Validate and parse each guideline
-                seen_ids_in_file = set()
-
-                for idx, item in enumerate(guidelines_data):
-                    try:
-                        # Provide context about what we're parsing
-                        if not isinstance(item, dict):
-                            raise ValueError(
-                                f"Guideline at index {idx} must be a dictionary, "
-                                f"found {type(item).__name__}"
-                            )
-
-                        # Extract and validate label
-                        if 'label' not in item:
-                            raise ValueError(
-                                f"Guideline at index {idx} missing required 'label' field"
-                            )
-
-                        label = item['label']
-                        if not isinstance(label, str):
-                            raise ValueError(
-                                f"Label must be a string at index {idx}"
-                            )
-
-                        # Validate label format (lowercase, alphanumeric, hyphens)
-                        if not re.match(r'^[a-z0-9-]+$', label):
-                            raise ValueError(
-                                f"Label '{label}' at index {idx} must be lowercase alphanumeric with hyphens"
-                            )
-
-                        if label.startswith('-') or label.endswith('-'):
-                            raise ValueError(
-                                f"Label '{label}' at index {idx} cannot start or end with a hyphen"
-                            )
-
-                        # Generate ID from prefix and label
-                        generated_id = f"{prefix}/{label}"
-
-                        # Check for duplicate labels within this file
-                        if generated_id in seen_ids_in_file:
-                            raise ValueError(
-                                f"Duplicate guideline label '{label}' at index {idx} (ID: {generated_id})"
-                            )
-                        seen_ids_in_file.add(generated_id)
-
-                        # Validate description field exists
-                        if 'description' not in item:
-                            raise ValueError(
-                                f"Guideline at index {idx} missing required 'description' field"
-                            )
-
-                        # Create guideline with generated ID
-                        guideline = Guideline(
-                            id=generated_id,
-                            description=item['description']
-                        )
-
-                        all_guidelines.append(guideline)
-                    except Exception as e:
-                        # Provide helpful context with the guideline data
-                        item_preview = str(item)[:100] + "..." if len(str(item)) > 100 else str(item)
-                        raise ValueError(
-                            f"Invalid guideline at index {idx} in {path.name}: {e}\n"
-                            f"Guideline data: {item_preview}"
-                        ) from e
+                # Parse guidelines using extracted helper
+                local_guidelines = self._parse_guidelines_from_data(
+                    guidelines_data, prefix, path
+                )
+                all_guidelines.extend(local_guidelines)
 
         elif not all_guidelines:
             # No guidelines and no includes
@@ -191,6 +117,203 @@ class GuidelinesParser:
             )
 
         return all_guidelines
+
+    def parse_file_with_metadata(
+        self,
+        path: Path,
+        allow_includes: bool = True,
+        processed_files: set = None
+    ) -> GuidelineSetInfo:
+        """
+        Parse a YAML file and return metadata without merging includes.
+
+        Unlike parse_file(), this method extracts include references but does NOT
+        recursively parse and merge them. It only parses local guidelines defined
+        in the file itself.
+
+        Args:
+            path: Path to guidelines YAML file
+            allow_includes: Whether to extract 'includes' directive
+            processed_files: Set of already processed files (prevents circular includes)
+
+        Returns:
+            GuidelineSetInfo: Metadata containing source file, local guidelines, and included file paths
+
+        Raises:
+            FileNotFoundError: If the file doesn't exist
+            yaml.YAMLError: If YAML syntax is invalid
+            ValueError: If YAML structure is invalid
+            GuidelineIncludeError: If includes are malformed or circular
+            BuiltinGuidelineNotFoundError: If referenced built-in doesn't exist
+        """
+        if processed_files is None:
+            processed_files = set()
+
+        # Prevent circular includes
+        if path in processed_files:
+            raise GuidelineIncludeError(f"Circular include detected: {path}")
+
+        processed_files.add(path)
+
+        # Read and validate YAML structure
+        data = self._read_and_validate_yaml(path)
+
+        # Extract included file paths (if enabled) but don't parse them
+        included_paths = []
+        if allow_includes and 'includes' in data:
+            included_paths = self._parse_includes(data, path)
+
+        # Process only local guidelines (if present)
+        local_guidelines = []
+        if 'guidelines' in data:
+            guidelines_data = data['guidelines']
+
+            if not isinstance(guidelines_data, list):
+                raise ValueError("'guidelines' must be a list")
+
+            if guidelines_data:
+                # Extract prefix from filename
+                prefix = path.stem  # e.g., "security" from "security.yaml"
+
+                # Parse guidelines using extracted helper
+                local_guidelines = self._parse_guidelines_from_data(
+                    guidelines_data, prefix, path
+                )
+
+        # Validate that file contains either guidelines or includes
+        if not local_guidelines and not included_paths:
+            available_keys = ', '.join(f"'{k}'" for k in data.keys())
+            raise ValueError(
+                f"Guidelines file contains no guidelines. "
+                f"Expected 'guidelines' list or 'includes' list, "
+                f"but found: {available_keys if available_keys else 'empty file'}"
+            )
+
+        return GuidelineSetInfo(
+            source_file=path,
+            local_guidelines=local_guidelines,
+            included_files=included_paths
+        )
+
+    def _read_and_validate_yaml(self, path: Path) -> dict:
+        """
+        Read and validate YAML file structure.
+
+        Args:
+            path: Path to YAML file
+
+        Returns:
+            Parsed YAML data as dictionary
+
+        Raises:
+            ValueError: If file is empty or top-level structure is not a dict
+        """
+        # Read and parse YAML
+        with open(path, 'r', encoding='utf-8') as f:
+            data = yaml.safe_load(f)
+
+        # Handle empty files
+        if data is None:
+            raise ValueError(
+                f"Guidelines file {path.name} is empty or contains only whitespace"
+            )
+
+        # Validate top-level structure
+        if not isinstance(data, dict):
+            raise ValueError(
+                f"Guidelines file must contain a YAML dictionary, "
+                f"but found {type(data).__name__} in {path.name}"
+            )
+
+        return data
+
+    def _parse_guidelines_from_data(
+        self,
+        guidelines_data: list,
+        prefix: str,
+        path: Path
+    ) -> List[Guideline]:
+        """
+        Parse and validate guidelines from YAML data.
+
+        Args:
+            guidelines_data: List of guideline dictionaries from YAML
+            prefix: Prefix for ID generation (typically filename stem)
+            path: Source file path (for error messages)
+
+        Returns:
+            List of validated Guideline objects
+
+        Raises:
+            ValueError: If any guideline is invalid
+        """
+        guidelines = []
+        seen_ids_in_file = set()
+
+        for idx, item in enumerate(guidelines_data):
+            try:
+                # Provide context about what we're parsing
+                if not isinstance(item, dict):
+                    raise ValueError(
+                        f"Guideline at index {idx} must be a dictionary, "
+                        f"found {type(item).__name__}"
+                    )
+
+                # Extract and validate label
+                if 'label' not in item:
+                    raise ValueError(
+                        f"Guideline at index {idx} missing required 'label' field"
+                    )
+
+                label = item['label']
+                if not isinstance(label, str):
+                    raise ValueError(
+                        f"Label must be a string at index {idx}"
+                    )
+
+                # Validate label format (lowercase, alphanumeric, hyphens)
+                if not re.match(r'^[a-z0-9-]+$', label):
+                    raise ValueError(
+                        f"Label '{label}' at index {idx} must be lowercase alphanumeric with hyphens"
+                    )
+
+                if label.startswith('-') or label.endswith('-'):
+                    raise ValueError(
+                        f"Label '{label}' at index {idx} cannot start or end with a hyphen"
+                    )
+
+                # Generate ID from prefix and label
+                generated_id = f"{prefix}/{label}"
+
+                # Check for duplicate labels within this file
+                if generated_id in seen_ids_in_file:
+                    raise ValueError(
+                        f"Duplicate guideline label '{label}' at index {idx} (ID: {generated_id})"
+                    )
+                seen_ids_in_file.add(generated_id)
+
+                # Validate description field exists
+                if 'description' not in item:
+                    raise ValueError(
+                        f"Guideline at index {idx} missing required 'description' field"
+                    )
+
+                # Create guideline with generated ID
+                guideline = Guideline(
+                    id=generated_id,
+                    description=item['description']
+                )
+
+                guidelines.append(guideline)
+            except Exception as e:
+                # Provide helpful context with the guideline data
+                item_preview = str(item)[:100] + "..." if len(str(item)) > 100 else str(item)
+                raise ValueError(
+                    f"Invalid guideline at index {idx} in {path.name}: {e}\n"
+                    f"Guideline data: {item_preview}"
+                ) from e
+
+        return guidelines
 
     def _parse_includes(self, yaml_data: dict, source_file: Path) -> List[Path]:
         """
