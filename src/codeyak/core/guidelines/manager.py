@@ -19,7 +19,7 @@ class GuidelinesManager:
 
     Supports:
     - Built-in guidelines shipped with the package
-    - Project-specific guidelines in .code_review/ directory
+    - Project-specific guidelines in .codeyak/ directory
     - Include mechanism for referencing built-in guidelines
     """
 
@@ -32,10 +32,10 @@ class GuidelinesManager:
         Load guideline sets from built-in and project-specific sources.
 
         Loading strategy:
-        1. If .code_review/ directory exists with YAML files:
+        1. If .codeyak/ directory exists with YAML files:
            - Load all project-specific YAML files
            - Process any 'includes' directives in those files
-        2. If .code_review/ directory doesn't exist or is empty:
+        2. If .codeyak/ directory doesn't exist or is empty:
            - Auto-load built-in 'default' guideline set
 
         Each guideline set (file) becomes a separate review pass.
@@ -61,19 +61,19 @@ class GuidelinesManager:
 
     def _scan_project_yaml_files(self) -> List[Path]:
         """
-        Scan for YAML files in the project's .code_review/ directory.
+        Scan for YAML files in the project's .codeyak/ directory.
 
         Returns:
             List[Path]: Sorted list of YAML file paths, empty if none found
         """
-        code_review_dir = Path.cwd() / ".code_review"
+        codeyak_dir = Path.cwd() / ".codeyak"
 
-        if not code_review_dir.exists() or not code_review_dir.is_dir():
+        if not codeyak_dir.exists() or not codeyak_dir.is_dir():
             return []
 
         yaml_files = sorted(
-            list(code_review_dir.glob("*.yaml")) +
-            list(code_review_dir.glob("*.yml"))
+            list(codeyak_dir.glob("*.yaml")) +
+            list(codeyak_dir.glob("*.yml"))
         )
 
         return yaml_files
@@ -91,8 +91,8 @@ class GuidelinesManager:
         Raises:
             GuidelinesLoadError: If files are invalid or have duplicate IDs
         """
-        code_review_dir = Path.cwd() / ".code_review"
-        print(f"Loading project-specific guidelines from {code_review_dir}...")
+        codeyak_dir = Path.cwd() / ".codeyak"
+        print(f"Loading project-specific guidelines from {codeyak_dir}...")
 
         guideline_sets = {}
         all_seen_ids = set()
@@ -136,7 +136,7 @@ class GuidelinesManager:
         Raises:
             GuidelinesLoadError: If default guideline set not found
         """
-        print("ℹ️  No project-specific guidelines found in .code_review/")
+        print("ℹ️  No project-specific guidelines found in .codeyak/")
         print("Loading built-in 'default' guideline set...")
 
         try:

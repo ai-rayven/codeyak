@@ -11,11 +11,11 @@ from codeyak.core.guidelines.parser import GuidelinesParser
 
 @pytest.fixture
 def temp_project_dir():
-    """Create a temporary project directory with .code_review/ subdirectory."""
+    """Create a temporary project directory with .codeyak/ subdirectory."""
     with tempfile.TemporaryDirectory() as tmpdir:
         tmpdir_path = Path(tmpdir)
-        code_review_dir = tmpdir_path / ".code_review"
-        code_review_dir.mkdir()
+        codeyak_dir = tmpdir_path / ".codeyak"
+        codeyak_dir.mkdir()
         yield tmpdir_path
 
 

@@ -15,13 +15,13 @@ class TestProjectFileDiscovery:
     """Tests for _scan_project_yaml_files method."""
 
     def test_scan_project_yaml_files_found(self, manager, temp_project_dir, monkeypatch):
-        """Test scanning .code_review/ directory with YAML files."""
+        """Test scanning .codeyak/ directory with YAML files."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
         # Create some YAML files
-        (code_review_dir / "custom.yaml").write_text("guidelines: []")
-        (code_review_dir / "security.yaml").write_text("guidelines: []")
+        (codeyak_dir / "custom.yaml").write_text("guidelines: []")
+        (codeyak_dir / "security.yaml").write_text("guidelines: []")
 
         yaml_files = manager._scan_project_yaml_files()
 
@@ -32,27 +32,27 @@ class TestProjectFileDiscovery:
         assert yaml_files[1].name == "security.yaml"
 
     def test_scan_project_yaml_files_not_found(self, manager, monkeypatch):
-        """Test scanning when .code_review/ directory doesn't exist."""
+        """Test scanning when .codeyak/ directory doesn't exist."""
         with tempfile.TemporaryDirectory() as tmpdir:
             monkeypatch.chdir(tmpdir)
-            # Don't create .code_review/ directory
+            # Don't create .codeyak/ directory
             yaml_files = manager._scan_project_yaml_files()
             assert yaml_files == []
 
     def test_scan_project_yaml_files_empty_dir(self, manager, temp_project_dir, monkeypatch):
-        """Test scanning empty .code_review/ directory."""
+        """Test scanning empty .codeyak/ directory."""
         monkeypatch.chdir(temp_project_dir)
-        # .code_review/ exists but is empty
+        # .codeyak/ exists but is empty
         yaml_files = manager._scan_project_yaml_files()
         assert yaml_files == []
 
     def test_scan_project_yaml_files_mixed_extensions(self, manager, temp_project_dir, monkeypatch):
         """Test scanning directory with both .yaml and .yml files."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        (code_review_dir / "file1.yaml").write_text("guidelines: []")
-        (code_review_dir / "file2.yml").write_text("guidelines: []")
+        (codeyak_dir / "file1.yaml").write_text("guidelines: []")
+        (codeyak_dir / "file2.yml").write_text("guidelines: []")
 
         yaml_files = manager._scan_project_yaml_files()
 
@@ -63,12 +63,12 @@ class TestProjectFileDiscovery:
     def test_scan_project_yaml_files_sorted(self, manager, temp_project_dir, monkeypatch):
         """Test that files are returned in sorted order."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
         # Create files in non-alphabetical order
-        (code_review_dir / "zebra.yaml").write_text("guidelines: []")
-        (code_review_dir / "alpha.yaml").write_text("guidelines: []")
-        (code_review_dir / "beta.yaml").write_text("guidelines: []")
+        (codeyak_dir / "zebra.yaml").write_text("guidelines: []")
+        (codeyak_dir / "alpha.yaml").write_text("guidelines: []")
+        (codeyak_dir / "beta.yaml").write_text("guidelines: []")
 
         yaml_files = manager._scan_project_yaml_files()
 
@@ -80,11 +80,11 @@ class TestProjectFileDiscovery:
     def test_scan_project_yaml_files_ignores_other_files(self, manager, temp_project_dir, monkeypatch):
         """Test that non-YAML files are ignored."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        (code_review_dir / "guidelines.yaml").write_text("guidelines: []")
-        (code_review_dir / "readme.txt").write_text("some text")
-        (code_review_dir / "notes.md").write_text("# Notes")
+        (codeyak_dir / "guidelines.yaml").write_text("guidelines: []")
+        (codeyak_dir / "readme.txt").write_text("some text")
+        (codeyak_dir / "notes.md").write_text("# Notes")
 
         yaml_files = manager._scan_project_yaml_files()
 
@@ -98,9 +98,9 @@ class TestLoadingProjectGuidelines:
     def test_load_project_guidelines_success(self, manager, temp_project_dir, monkeypatch):
         """Test successfully loading project guidelines."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        yaml_file = code_review_dir / "custom.yaml"
+        yaml_file = codeyak_dir / "custom.yaml"
         yaml_file.write_text("""
 guidelines:
   - label: custom-rule
@@ -118,16 +118,16 @@ guidelines:
     def test_load_project_guidelines_multiple_files(self, manager, temp_project_dir, monkeypatch):
         """Test loading multiple project guideline files."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        file1 = code_review_dir / "file1.yaml"
+        file1 = codeyak_dir / "file1.yaml"
         file1.write_text("""
 guidelines:
   - label: rule-1
     description: First rule from first file.
         """)
 
-        file2 = code_review_dir / "file2.yaml"
+        file2 = codeyak_dir / "file2.yaml"
         file2.write_text("""
 guidelines:
   - label: rule-2
@@ -144,9 +144,9 @@ guidelines:
     def test_load_project_guidelines_with_includes(self, manager, temp_project_dir, monkeypatch):
         """Test loading project file with includes directive."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        yaml_file = code_review_dir / "with-includes.yaml"
+        yaml_file = codeyak_dir / "with-includes.yaml"
         yaml_file.write_text("""
 includes:
   - builtin:security
@@ -169,9 +169,9 @@ guidelines:
     def test_load_project_guidelines_yaml_error(self, manager, temp_project_dir, monkeypatch):
         """Test that YAML syntax errors are wrapped in GuidelinesLoadError."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        yaml_file = code_review_dir / "bad.yaml"
+        yaml_file = codeyak_dir / "bad.yaml"
         yaml_file.write_text("guidelines:\n  - label: test\n    description: \"missing quote")
 
         yaml_files = [yaml_file]
@@ -182,9 +182,9 @@ guidelines:
     def test_load_project_guidelines_value_error(self, manager, temp_project_dir, monkeypatch):
         """Test that ValueError is wrapped in GuidelinesLoadError."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        yaml_file = code_review_dir / "invalid.yaml"
+        yaml_file = codeyak_dir / "invalid.yaml"
         yaml_file.write_text("guidelines: not_a_list")
 
         yaml_files = [yaml_file]
@@ -195,9 +195,9 @@ guidelines:
     def test_load_project_guidelines_display_name(self, manager, temp_project_dir, monkeypatch):
         """Test that display name format is correct."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        yaml_file = code_review_dir / "my-guidelines.yaml"
+        yaml_file = codeyak_dir / "my-guidelines.yaml"
         yaml_file.write_text("""
 guidelines:
   - label: test-rule
@@ -244,19 +244,19 @@ class TestDuplicateIDDetection:
     def test_duplicate_ids_across_files(self, manager, temp_project_dir, monkeypatch):
         """Test that duplicate IDs across files raise GuidelinesLoadError."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
         # Both files have the same prefix and label
-        file1 = code_review_dir / "security.yaml"
+        file1 = codeyak_dir / "security.yaml"
         file1.write_text("""
 guidelines:
   - label: sql-injection
     description: Prevent SQL injection in file 1.
         """)
 
-        file2 = code_review_dir / "security.yaml"  # Same name = same prefix
+        file2 = codeyak_dir / "security.yaml"  # Same name = same prefix
         # Actually, let's use different files but ensure same ID
-        file2 = code_review_dir / "security-rules.yaml"
+        file2 = codeyak_dir / "security-rules.yaml"
         file2.write_text("""
 guidelines:
   - label: sql-injection
@@ -385,9 +385,9 @@ class TestLoadGuidelineSets:
     def test_load_uses_project_when_available(self, manager, temp_project_dir, monkeypatch):
         """Test that project guidelines are used when available."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        yaml_file = code_review_dir / "custom.yaml"
+        yaml_file = codeyak_dir / "custom.yaml"
         yaml_file.write_text("""
 guidelines:
   - label: custom-rule
@@ -404,7 +404,7 @@ guidelines:
         """Test that builtin default is used when no project guidelines exist."""
         with tempfile.TemporaryDirectory() as tmpdir:
             monkeypatch.chdir(tmpdir)
-            # No .code_review/ directory
+            # No .codeyak/ directory
 
             guideline_sets = manager.load_guideline_sets()
 
@@ -414,9 +414,9 @@ guidelines:
     def test_load_validates_guideline_sets(self, manager, temp_project_dir, monkeypatch, mocker):
         """Test that validation is called during loading."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        yaml_file = code_review_dir / "test.yaml"
+        yaml_file = codeyak_dir / "test.yaml"
         yaml_file.write_text("""
 guidelines:
   - label: test-rule
@@ -434,9 +434,9 @@ guidelines:
     def test_load_prints_summary(self, manager, temp_project_dir, monkeypatch, mocker):
         """Test that summary is printed during loading."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
-        yaml_file = code_review_dir / "test.yaml"
+        yaml_file = codeyak_dir / "test.yaml"
         yaml_file.write_text("""
 guidelines:
   - label: test-rule
@@ -454,10 +454,10 @@ guidelines:
     def test_load_integration_project_guidelines(self, manager, temp_project_dir, monkeypatch):
         """Integration test: Load project guidelines end-to-end."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
         # Create two project files
-        file1 = code_review_dir / "security.yaml"
+        file1 = codeyak_dir / "security.yaml"
         file1.write_text("""
 guidelines:
   - label: sql-injection
@@ -466,7 +466,7 @@ guidelines:
     description: Prevent cross-site scripting attacks.
         """)
 
-        file2 = code_review_dir / "style.yaml"
+        file2 = codeyak_dir / "style.yaml"
         file2.write_text("""
 guidelines:
   - label: naming-conventions
@@ -503,23 +503,23 @@ class TestExceptionHandling:
     def test_guidelines_load_error_pass_through(self, manager, temp_project_dir, monkeypatch):
         """Test that GuidelinesLoadError is not double-wrapped."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
         # Create file that will cause GuidelinesLoadError (e.g., circular include)
         # For this test, we'll create a duplicate ID scenario
 
-        file1 = code_review_dir / "dup1.yaml"
+        file1 = codeyak_dir / "dup1.yaml"
         file1.write_text("""
 guidelines:
   - label: same-label
     description: First occurrence
         """)
 
-        file2 = code_review_dir / "dup1.yaml"  # Same filename = same prefix
+        file2 = codeyak_dir / "dup1.yaml"  # Same filename = same prefix
         # Actually this won't work, let's manually trigger it
 
         # Instead, let's test with invalid YAML
-        bad_file = code_review_dir / "bad.yaml"
+        bad_file = codeyak_dir / "bad.yaml"
         bad_file.write_text("invalid: yaml: syntax:")
 
         # Should raise GuidelinesLoadError, not Exception
@@ -529,10 +529,10 @@ guidelines:
     def test_parser_exceptions_bubble_up(self, manager, temp_project_dir, monkeypatch):
         """Test that parser exceptions are properly wrapped."""
         monkeypatch.chdir(temp_project_dir)
-        code_review_dir = temp_project_dir / ".code_review"
+        codeyak_dir = temp_project_dir / ".codeyak"
 
         # Create file with invalid structure
-        yaml_file = code_review_dir / "invalid.yaml"
+        yaml_file = codeyak_dir / "invalid.yaml"
         yaml_file.write_text("guidelines: not_a_list")
 
         with pytest.raises(GuidelinesLoadError, match="Invalid guidelines format"):
