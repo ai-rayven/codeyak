@@ -1,16 +1,15 @@
-# CodeYak 🐻 
+# CodeYak 🐻 - A powerful AI code review agent that guards your codebase.
 
 <p align="center">
   <img src="images/codeyak-logo-circle.png" alt="CodeYak Logo" width="200"/>
 </p>
 
+Hunt down code issues before they reach production.
+
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-GitLab-orange)
 ![LLM](https://img.shields.io/badge/LLM-Azure%20OpenAI-green)
 
-**A powerful AI code review agent that guards your codebase.**
-
-Hunt down code issues before they reach production.
 
 **Built Strong:**
 - 🎯 **Territorial guidelines system** - Defend your code standards with built-in presets (security, style, balanced)
