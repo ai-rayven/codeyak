@@ -16,6 +16,13 @@ dependencies = [
     "pyyaml>=6.0.1",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest>=8.0.0",
+    "pytest-cov>=6.0.0",
+    "pytest-mock>=3.14.0",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"
@@ -26,3 +33,16 @@ packages = ["src/code_reviewer"]
 # Ensure guidelines are included in the package
 [tool.hatch.build.targets.wheel.force-include]
 "src/code_reviewer/guidelines" = "code_reviewer/guidelines"
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-ra",
+    "--strict-markers",
+    "--strict-config",
+    "--showlocals",
+]

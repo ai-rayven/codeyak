@@ -1,0 +1,5 @@
+guidelines:
+  - label: no-print
+    description: First occurrence of no-print guideline for testing duplicates.
+  - label: no-print
+    description: Second occurrence - duplicate label should cause error.

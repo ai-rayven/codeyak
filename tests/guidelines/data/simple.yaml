@@ -1,0 +1,5 @@
+guidelines:
+  - label: no-print
+    description: Avoid using print statements in production code for debugging.
+  - label: use-logging
+    description: Use proper logging framework instead of print for debugging and monitoring.

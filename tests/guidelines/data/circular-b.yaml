@@ -1,0 +1,6 @@
+includes:
+  - builtin:circular_a
+
+guidelines:
+  - label: rule-b
+    description: Guideline from circular test file B for testing circular includes.

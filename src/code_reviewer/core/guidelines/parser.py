@@ -7,6 +7,7 @@ support for the 'includes' directive.
 
 from typing import List
 from pathlib import Path
+import re
 import yaml
 from .models import Guideline
 from .exceptions import (
