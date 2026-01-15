@@ -7,13 +7,13 @@ from pathlib import Path
 import pytest
 import yaml
 
-from code_reviewer.core.guidelines.exceptions import (
+from codeyak.core.guidelines.exceptions import (
     BuiltinGuidelineNotFoundError,
     GuidelineIncludeError,
     GuidelinesLoadError,
 )
-from code_reviewer.core.guidelines.models import Guideline
-from code_reviewer.core.guidelines.parser import GuidelinesParser
+from codeyak.core.guidelines.models import Guideline
+from codeyak.core.guidelines.parser import GuidelinesParser
 
 
 class TestBasicParsing:

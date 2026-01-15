@@ -311,14 +311,14 @@ class GuidelinesParser:
 
             # Python 3.9+ approach
             if hasattr(resources, 'files'):
-                package_files = resources.files('code_reviewer')
+                package_files = resources.files('codeyak')
                 guidelines_path = package_files / 'guidelines'
 
                 # Convert to Path and verify it exists
                 builtin_path = Path(str(guidelines_path))
                 if not builtin_path.exists():
                     # Try alternative: using package __file__
-                    # We're in core/guidelines/parser.py, need to go up to code_reviewer/
+                    # We're in core/guidelines/parser.py, need to go up to codeyak/
                     package_root = Path(__file__).parent.parent.parent
                     builtin_path = package_root / 'guidelines'
 

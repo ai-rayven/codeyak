@@ -1,1 +1,1 @@
-"""Tests for code-reviewer package."""
+"""Tests for CodeYak package."""

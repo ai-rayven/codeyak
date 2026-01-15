@@ -1,4 +1,4 @@
-# AI Code Review Agent
+# CodeYak - AI Code Review Agent
 
 ![Python Version](https://img.shields.io/badge/python-3.12%2B-blue)
 ![Platform](https://img.shields.io/badge/platform-GitLab-orange)
@@ -29,7 +29,7 @@ Automatically review GitLab merge requests using customizable guidelines powered
      script:
        - git clone $AGENT_REPO_URL agent_code && cd agent_code
        - uv sync --frozen
-       - uv run python -m code_reviewer $CI_MERGE_REQUEST_IID $CI_PROJECT_ID
+       - uv run python -m codeyak $CI_MERGE_REQUEST_IID $CI_PROJECT_ID
      rules:
        - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
    ```
@@ -139,18 +139,18 @@ LANGFUSE_HOST=https://cloud.langfuse.com
 
 ```bash
 # Install
-git clone <repo-url> && cd code-reviewer
+git clone <repo-url> && cd codeyak
 cp .env.example .env  # Fill in credentials
 uv sync
 
 # Run review
-uv run python -m code_reviewer <MR_IID> <PROJECT_ID>
+uv run python -m codeyak <MR_IID> <PROJECT_ID>
 
 # Test with custom guidelines
 mkdir -p .code_review
 echo "includes:
   - builtin:security" > .code_review/security.yaml
-uv run python -m code_reviewer <MR_IID> <PROJECT_ID>
+uv run python -m codeyak <MR_IID> <PROJECT_ID>
 ```
 
 ## How It Works

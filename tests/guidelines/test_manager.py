@@ -6,9 +6,9 @@ from pathlib import Path
 import pytest
 import yaml
 
-from code_reviewer.core.guidelines.exceptions import GuidelinesLoadError
-from code_reviewer.core.guidelines.manager import GuidelinesManager
-from code_reviewer.core.guidelines.models import Guideline
+from codeyak.core.guidelines.exceptions import GuidelinesLoadError
+from codeyak.core.guidelines.manager import GuidelinesManager
+from codeyak.core.guidelines.models import Guideline
 
 
 class TestProjectFileDiscovery:

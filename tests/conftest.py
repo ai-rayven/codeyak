@@ -5,8 +5,8 @@ from pathlib import Path
 
 import pytest
 
-from code_reviewer.core.guidelines.manager import GuidelinesManager
-from code_reviewer.core.guidelines.parser import GuidelinesParser
+from codeyak.core.guidelines.manager import GuidelinesManager
+from codeyak.core.guidelines.parser import GuidelinesParser
 
 
 @pytest.fixture
