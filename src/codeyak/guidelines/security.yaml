@@ -5,13 +5,10 @@
 guidelines:
   # Secret Management
   - label: hardcoded-secrets
-    description: Avoid hardcoded secrets, API keys, or passwords.
+    description: Avoid hardcoded secrets, or passwords.
 
   - label: vcs-secrets
     description: Never commit secrets or credentials to version control. Use environment variables or secure vaults.
-
-  - label: logging-sensitive-data
-    description: Ensure sensitive data is not logged or printed to console or debug output.
 
   # Input Validation & Injection Prevention
   - label: input-validation

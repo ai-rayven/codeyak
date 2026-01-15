@@ -3,5 +3,4 @@
 # These guidelines represent comprehensive code review coverage for most projects.
 
 includes:
-  - builtin:security
   - builtin:code-quality

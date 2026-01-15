@@ -7,11 +7,8 @@ guidelines:
   - label: single-responsibility
     description: Functions and classes should do one thing well. Keep them short, focused, and avoid God classes/services that handle too many responsibilities.
 
-  - label: cyclomatic-complexity
-    description: Reduce cyclomatic complexity. Break down complex conditional logic into smaller, focused functions.
-
   - label: separation-of-concerns
-    description: Maintain clear separation of concerns at the architectural level. Different layers and modules should have distinct responsibilities.
+    description: Maintain clear separation of concerns at the architectural level. Different layers and modules should have distinct responsibilities. Break down complex conditional logic into smaller, focused functions.
 
   # Naming & Clarity
   - label: descriptive-names
@@ -30,16 +27,6 @@ guidelines:
   - label: remove-dead-code
     description: Remove dead code, commented-out code, and unused imports. Keep the codebase clean.
 
-  # DRY Principle (Don't Repeat Yourself)
-  - label: avoid-duplication
-    description: Avoid code duplication. Extract repeated logic into reusable functions or classes.
-
-  - label: avoid-premature-abstraction
-    description: Use abstraction to eliminate duplication, but avoid premature abstraction.
-
   # Error Handling
   - label: handle-exceptions
-    description: Do not catch exceptions unless you are handling them. Let them bubble up.
-
-  - label: specific-exceptions
-    description: Avoid bare except clauses. Catch specific exceptions and handle them appropriately.
+    description: Do not catch exceptions unless you are handling them. Let them bubble up. It is ok to swallow general exceptions and log in fire and forget use cases.
