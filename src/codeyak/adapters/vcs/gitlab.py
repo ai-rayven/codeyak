@@ -33,7 +33,6 @@ class GitLabAdapter(VCSClient):
                 
             diffs.append(FileDiff(
                 file_path=change['new_path'],
-                old_path=change['old_path'],
                 diff_content=change['diff'],
             ))
             

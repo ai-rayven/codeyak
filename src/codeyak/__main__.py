@@ -1,6 +1,6 @@
 import sys
 import os
-from .config import settings
+from .config import get_settings
 from .adapters.vcs.gitlab import GitLabAdapter
 from .adapters.llm.azure import AzureAdapter
 from .core.engine import ReviewEngine
@@ -9,15 +9,15 @@ from .core.guidelines import GuidelinesManager
 def log_settings():
     # Log all settings for debugging
     print("\n📋 Configuration Settings:")
-    print(f"  GITLAB_URL: {settings.GITLAB_URL}")
-    print(f"  GITLAB_TOKEN: {settings.GITLAB_TOKEN[:8]}...{settings.GITLAB_TOKEN[-4:] if len(settings.GITLAB_TOKEN) > 12 else '***'}")
-    print(f"  AZURE_OPENAI_API_KEY: {settings.AZURE_OPENAI_API_KEY[:8]}...{settings.AZURE_OPENAI_API_KEY[-4:] if len(settings.AZURE_OPENAI_API_KEY) > 12 else '***'}")
-    print(f"  AZURE_OPENAI_ENDPOINT: {settings.AZURE_OPENAI_ENDPOINT}")
-    print(f"  AZURE_OPENAI_API_VERSION: {settings.AZURE_OPENAI_API_VERSION}")
-    print(f"  AZURE_DEPLOYMENT_NAME: {settings.AZURE_DEPLOYMENT_NAME}")
-    print(f"  LANGFUSE_SECRET_KEY: {'(set)' if settings.LANGFUSE_SECRET_KEY else '(not set)'}")
-    print(f"  LANGFUSE_PUBLIC_KEY: {'(set)' if settings.LANGFUSE_PUBLIC_KEY else '(not set)'}")
-    print(f"  LANGFUSE_HOST: {settings.LANGFUSE_HOST}")
+    print(f"  GITLAB_URL: {get_settings().GITLAB_URL}")
+    print(f"  GITLAB_TOKEN: {get_settings().GITLAB_TOKEN[:8]}...{get_settings().GITLAB_TOKEN[-4:] if len(get_settings().GITLAB_TOKEN) > 12 else '***'}")
+    print(f"  AZURE_OPENAI_API_KEY: {get_settings().AZURE_OPENAI_API_KEY[:8]}...{get_settings().AZURE_OPENAI_API_KEY[-4:] if len(get_settings().AZURE_OPENAI_API_KEY) > 12 else '***'}")
+    print(f"  AZURE_OPENAI_ENDPOINT: {get_settings().AZURE_OPENAI_ENDPOINT}")
+    print(f"  AZURE_OPENAI_API_VERSION: {get_settings().AZURE_OPENAI_API_VERSION}")
+    print(f"  AZURE_DEPLOYMENT_NAME: {get_settings().AZURE_DEPLOYMENT_NAME}")
+    print(f"  LANGFUSE_SECRET_KEY: {'(set)' if get_settings().LANGFUSE_SECRET_KEY else '(not set)'}")
+    print(f"  LANGFUSE_PUBLIC_KEY: {'(set)' if get_settings().LANGFUSE_PUBLIC_KEY else '(not set)'}")
+    print(f"  LANGFUSE_HOST: {get_settings().LANGFUSE_HOST}")
     print()
 
 def main():
@@ -43,16 +43,16 @@ def main():
     # We explicitly inject the dependencies here.
     try:
         vcs = GitLabAdapter(
-            url=settings.GITLAB_URL,
-            token=settings.GITLAB_TOKEN,
+            url=get_settings().GITLAB_URL,
+            token=get_settings().GITLAB_TOKEN,
             project_id=project_id
         )
         
         llm = AzureAdapter(
-            api_key=settings.AZURE_OPENAI_API_KEY,
-            endpoint=settings.AZURE_OPENAI_ENDPOINT,
-            deployment_name=settings.AZURE_DEPLOYMENT_NAME,
-            api_version=settings.AZURE_OPENAI_API_VERSION
+            api_key=get_settings().AZURE_OPENAI_API_KEY,
+            endpoint=get_settings().AZURE_OPENAI_ENDPOINT,
+            deployment_name=get_settings().AZURE_DEPLOYMENT_NAME,
+            api_version=get_settings().AZURE_OPENAI_API_VERSION
         )
     except Exception as e:
         print(f"❌ Configuration Error: {e}")

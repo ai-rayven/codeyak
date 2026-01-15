@@ -1,10 +1,10 @@
-from typing import List
+from typing import List, Optional
 from .models import FileDiff, Guideline, MRComment
 
 def build_review_messages(
     diffs: List[FileDiff],
     guidelines: List[Guideline],
-    existing_comments: List[MRComment] = None
+    existing_comments: Optional[List[MRComment]] = None
 ) -> List[dict]:
     # 1. System Prompt: Define the Persona and Rules
     system_content = (

@@ -19,5 +19,17 @@ class Settings(BaseSettings):
     # Loads from .env file automatically
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
-# Singleton instance to import elsewhere
-settings = Settings()
+# Private singleton instance
+_settings = None
+
+def get_settings() -> Settings:
+    """
+    Get or create the settings singleton.
+
+    Raises:
+        pydantic.ValidationError: If required environment variables are missing
+    """
+    global _settings
+    if _settings is None:
+        _settings = Settings()
+    return _settings
