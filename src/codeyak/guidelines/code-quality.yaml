@@ -1,17 +1,24 @@
-# Maintainability Code Review Guidelines
-# This guideline set emphasizes architecture, organization, and long-term code health.
-# Use this for projects prioritizing maintainability and reducing technical debt.
+# Code Quality Guidelines
+# This guideline set emphasizes clean code, readability, and maintainability.
+# Use this for projects prioritizing understandable, well-structured code.
 
 guidelines:
-  # Architecture & Design
+  # Function & Class Design
   - label: single-responsibility
-    description: Functions should do one thing well. Follow the Single Responsibility Principle.
+    description: Functions and classes should do one thing well. Keep them short, focused, and avoid God classes/services that handle too many responsibilities.
 
   - label: cyclomatic-complexity
-    description: Reduce cyclomatic complexity. Break down complex conditional logic into smaller functions.
+    description: Reduce cyclomatic complexity. Break down complex conditional logic into smaller, focused functions.
 
   - label: separation-of-concerns
-    description: Maintain clear separation of concerns. Avoid God services or God classes that handle too many unrelated responsibilities.
+    description: Maintain clear separation of concerns at the architectural level. Different layers and modules should have distinct responsibilities.
+
+  # Naming & Clarity
+  - label: descriptive-names
+    description: Use clear, descriptive names that reveal intent. Avoid abbreviations (unless widely understood) and generic names like data, info, temp, or process.
+
+  - label: self-documenting-code
+    description: Write self-documenting code that is clear without comments. When comments are needed, explain why (not what) - the code should show what it does.
 
   # Code Organization
   - label: logical-organization
