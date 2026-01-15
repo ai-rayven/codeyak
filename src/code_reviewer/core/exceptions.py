@@ -1,6 +1,8 @@
 """
-Domain-specific exceptions for the code review system.
-These provide abstraction from VCS-specific error types.
+Core exceptions for the code review system.
+
+These are cross-cutting exceptions used by multiple modules, primarily
+for VCS operations and general system errors.
 """
 
 

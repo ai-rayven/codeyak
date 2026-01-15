@@ -1,15 +1,25 @@
 from typing import List
-import json
 from .ports import VCSClient, LLMClient
-from .models import Guideline, ReviewResult, MRComment
+from .models import ReviewResult, MRComment
 from .grouping import create_file_groups
 from .prompts import build_review_messages
-from .exceptions import LineNotInDiffError, VCSCommentError, VCSFetchCommentsError
+from .guidelines import GuidelinesManager
+from .exceptions import (
+    LineNotInDiffError,
+    VCSCommentError,
+    VCSFetchCommentsError
+)
 
 class ReviewEngine:
-    def __init__(self, vcs: VCSClient, llm: LLMClient):
+    def __init__(
+        self,
+        vcs: VCSClient,
+        llm: LLMClient,
+        guidelines: GuidelinesManager
+    ):
         self.vcs = vcs
         self.llm = llm
+        self.guidelines_manager = guidelines
 
     def run(self, mr_id: str):
         print(f"Starting review for MR {mr_id}...")
@@ -29,32 +39,42 @@ class ReviewEngine:
             print("Continuing without comment context...")
             existing_comments = []
 
-        # 2. Prepare chunks
+        # 2. Prepare chunks (once for all guideline sets)
         groups = create_file_groups(diffs)
-        guidelines = self._load_guidelines()
         print(f"Split {len(diffs)} files into {len(groups)} analysis groups.")
 
-        # 3. Analyze each group
+        # 3. Load guideline sets (one per file)
+        guideline_sets = self.guidelines_manager.load_guideline_sets()
+
+        # 4. Run focused review for each guideline set
         total_original_violations = 0
         total_filtered_violations = 0
-        for group in groups:
-            print(f"   Processing Group {group.group_id} ({len(group.files)} files)...")
 
-            # Build messages with comment context
-            messages = build_review_messages(group.files, guidelines, existing_comments)
+        for filename, guidelines in guideline_sets.items():
+            print(f"\n{'='*80}")
+            print(f"🔍 Running focused review with {filename} ({len(guidelines)} guidelines)")
+            print(f"{'='*80}")
 
-            result = self.llm.generate(messages, response_model=ReviewResult)
+            # Analyze each file group with this guideline set
+            for group in groups:
+                print(f"   Processing Group {group.group_id} ({len(group.files)} files)...")
 
-            # Filter duplicates and track both counts
-            filtered_result, original_count = self._filter_existing_violations(result, existing_comments)
-            total_original_violations += original_count
+                # Build messages with comment context
+                messages = build_review_messages(group.files, guidelines, existing_comments)
 
-            violations_count = self._process_results(mr_id, filtered_result)
-            total_filtered_violations += violations_count
+                result = self.llm.generate(messages, response_model=ReviewResult)
 
-            print(f" {filtered_result.model_dump_json()}")
+                # Filter duplicates and track both counts
+                filtered_result, original_count = self._filter_existing_violations(result, existing_comments)
+                total_original_violations += original_count
 
-        # 4. Post success comment if no violations were detected
+                violations_count = self._process_results(mr_id, filtered_result)
+                total_filtered_violations += violations_count
+
+                print(f" {filtered_result.model_dump_json()}")
+
+        # 5. Post success comment if no violations were detected across all guideline sets
+        print(f"\n{'='*80}")
         if total_original_violations == 0:
             success_message = "✅ Code review completed successfully! No guideline violations found."
             try:
@@ -122,31 +142,3 @@ class ReviewEngine:
             print(f"     Filtered {filtered_count} duplicate violations")
 
         return ReviewResult(violations=filtered_violations), original_count
-
-    def _load_guidelines(self) -> List[Guideline]:
-        """
-        V1: Hardcoded rules.
-        V2: Load from guidelines.md or a database.
-        """
-        return [
-            Guideline(
-                id="SEC-01",
-                description="Avoid hardcoded secrets, API keys, or passwords."
-            ),
-            Guideline(
-                id="STYLE-01",
-                description="No long functions."
-            ),
-            Guideline(
-                id="STYLE-02",
-                description="The code must be very easy to read and understand."
-            ),
-            Guideline(
-                id="STYLE-03",
-                description="No long functions and no God services."
-            ),
-            Guideline(
-                id="ERR-01",
-                description="Do not catch exceptions unless you are handling them. Let them bubble up.",
-            ),
-        ]

@@ -4,6 +4,7 @@ from .config import settings
 from .adapters.vcs.gitlab import GitLabAdapter
 from .adapters.llm.azure import AzureAdapter
 from .core.engine import ReviewEngine
+from .core.guidelines import GuidelinesManager
 
 def log_settings():
     # Log all settings for debugging
@@ -57,10 +58,17 @@ def main():
         print(f"❌ Configuration Error: {e}")
         sys.exit(1)
 
-    # 3. Instantiate Engine (The Brain)
-    bot = ReviewEngine(vcs=vcs, llm=llm)
+    # 3. Instantiate Guidelines Manager
+    guidelines_manager = GuidelinesManager()
 
-    # 4. Run!
+    # 4. Instantiate Engine (The Brain)
+    bot = ReviewEngine(
+        vcs=vcs,
+        llm=llm,
+        guidelines=guidelines_manager
+    )
+
+    # 5. Run!
     bot.run(mr_id)
 
 if __name__ == "__main__":

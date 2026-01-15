@@ -1,0 +1,8 @@
+# Default Code Review Guidelines
+# This file imports a balanced set of security, readability, and maintainability guidelines.
+# These guidelines represent comprehensive code review coverage for most projects.
+
+includes:
+  - builtin:security
+  - builtin:readability
+  - builtin:maintainability

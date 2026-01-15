@@ -1,0 +1,54 @@
+# Security Code Review Guidelines
+# This guideline set emphasizes security best practices and vulnerability prevention.
+# Use this for projects handling sensitive data or requiring high security standards.
+
+guidelines:
+  # Secret Management
+  - label: hardcoded-secrets
+    description: Avoid hardcoded secrets, API keys, or passwords.
+
+  - label: vcs-secrets
+    description: Never commit secrets or credentials to version control. Use environment variables or secure vaults.
+
+  - label: logging-sensitive-data
+    description: Ensure sensitive data is not logged or printed to console or debug output.
+
+  # Input Validation & Injection Prevention
+  - label: input-validation
+    description: Always validate and sanitize user input to prevent injection attacks (SQL, command, LDAP, etc).
+
+  - label: sql-injection
+    description: Use parameterized queries or ORM methods to prevent SQL injection. Never concatenate user input into queries.
+
+  - label: command-injection
+    description: Validate and sanitize input before using in shell commands to prevent command injection.
+
+  - label: xss-prevention
+    description: Escape or sanitize user-generated content before rendering in HTML to prevent XSS attacks.
+
+  # Authentication & Authorization
+  - label: authentication
+    description: Implement proper authentication checks before granting access to protected resources.
+
+  - label: authorization
+    description: Verify authorization for every operation. Never rely solely on client-side checks.
+
+  - label: session-management
+    description: Use secure session management with proper timeout and invalidation mechanisms.
+
+  # Cryptography
+  - label: strong-crypto
+    description: Use strong, modern cryptographic algorithms. Avoid MD5, SHA1, DES, and other deprecated algorithms.
+
+  - label: no-custom-crypto
+    description: Never implement custom cryptographic algorithms. Use well-tested libraries.
+
+  - label: password-hashing
+    description: Store passwords using strong hashing algorithms with salt (e.g., bcrypt, Argon2, PBKDF2).
+
+  # Data Protection
+  - label: data-encryption
+    description: Encrypt sensitive data at rest and in transit using industry-standard encryption.
+
+  - label: error-info-leaks
+    description: Implement proper error handling that does not leak sensitive information or system details.

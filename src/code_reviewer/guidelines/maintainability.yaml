@@ -1,0 +1,38 @@
+# Maintainability Code Review Guidelines
+# This guideline set emphasizes architecture, organization, and long-term code health.
+# Use this for projects prioritizing maintainability and reducing technical debt.
+
+guidelines:
+  # Architecture & Design
+  - label: single-responsibility
+    description: Functions should do one thing well. Follow the Single Responsibility Principle.
+
+  - label: cyclomatic-complexity
+    description: Reduce cyclomatic complexity. Break down complex conditional logic into smaller functions.
+
+  - label: separation-of-concerns
+    description: Maintain clear separation of concerns. Avoid God services that handle too many responsibilities.
+
+  # Code Organization
+  - label: logical-organization
+    description: Organize code logically. Group related functionality together.
+
+  - label: proximity
+    description: Keep related code close together. Minimize the distance between definition and usage.
+
+  - label: remove-dead-code
+    description: Remove dead code, commented-out code, and unused imports. Keep the codebase clean.
+
+  # DRY Principle (Don't Repeat Yourself)
+  - label: avoid-duplication
+    description: Avoid code duplication. Extract repeated logic into reusable functions or classes.
+
+  - label: avoid-premature-abstraction
+    description: Use abstraction to eliminate duplication, but avoid premature abstraction.
+
+  # Error Handling
+  - label: handle-exceptions
+    description: Do not catch exceptions unless you are handling them. Let them bubble up.
+
+  - label: specific-exceptions
+    description: Avoid bare except clauses. Catch specific exceptions and handle them appropriately.

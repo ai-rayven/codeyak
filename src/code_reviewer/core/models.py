@@ -2,17 +2,10 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 import re
 
-# --- Inputs (What we give the Agent) ---
+# Import Guideline from guidelines package
+from .guidelines import Guideline
 
-class Guideline(BaseModel):
-    """
-    A specific rule the agent must enforce.
-    Examples:
-    - "No print() statements in production code."
-    - "All SQL queries must use parameterized binding."
-    """
-    id: str = Field(..., description="Unique ID (e.g., 'SEC-001', 'STY-005')")
-    description: str = Field(..., description="The clear instruction for the AI.")
+# --- Inputs (What we give the Agent) ---
 
 class FileDiff(BaseModel):
     """
@@ -53,17 +46,17 @@ class MRComment(BaseModel):
         """
         Extract guideline_id from comment body.
         Matches patterns like:
-        - **Violation of STYLE-02**:
-        - **STYLE-02**:
-        - Violation at `file.cs:138`\n\n**STYLE-02**:
+        - **Violation of security/sql-injection**:
+        - **readability/function-length**:
+        - Violation at `file.cs:138`\n\n**maintainability/single-responsibility**:
         """
         # Pattern 1: **Violation of GUIDELINE-ID**:
-        match = re.search(r'\*\*Violation of ([A-Z]+-\d+)\*\*:', body)
+        match = re.search(r'\*\*Violation of ([a-z0-9-]+/[a-z0-9-]+)\*\*:', body)
         if match:
             return match.group(1)
 
         # Pattern 2: **GUIDELINE-ID**: (for general comments)
-        match = re.search(r'\*\*([A-Z]+-\d+)\*\*:', body)
+        match = re.search(r'\*\*([a-z0-9-]+/[a-z0-9-]+)\*\*:', body)
         if match:
             return match.group(1)
 

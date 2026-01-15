@@ -13,6 +13,7 @@ dependencies = [
     "openai>=2.15.0",
     "pydantic-settings>=2.12.0",
     "python-gitlab>=7.1.0",
+    "pyyaml>=6.0.1",
 ]
 
 [build-system]
@@ -21,3 +22,7 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/code_reviewer"]
+
+# Ensure guidelines are included in the package
+[tool.hatch.build.targets.wheel.force-include]
+"src/code_reviewer/guidelines" = "code_reviewer/guidelines"

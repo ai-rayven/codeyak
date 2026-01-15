@@ -1,0 +1,28 @@
+# Readability Code Review Guidelines
+# This guideline set emphasizes code clarity, naming conventions, and documentation.
+# Use this for projects prioritizing clear and understandable code.
+
+guidelines:
+  # Function & Method Design
+  - label: function-length
+    description: No long functions.
+
+  - label: code-clarity
+    description: The code must be very easy to read and understand.
+
+  - label: no-god-classes
+    description: No long functions and no God services.
+
+  # Naming Conventions
+  - label: descriptive-names
+    description: Use clear, descriptive names for variables, functions, and classes. Avoid abbreviations unless widely understood.
+
+  - label: intentional-names
+    description: Names should reveal intent. Avoid generic names like data, info, temp, or process.
+
+  # Documentation & Comments
+  - label: self-documenting
+    description: Write self-documenting code. Code should be clear enough to understand without comments.
+
+  - label: comment-why-not-what
+    description: Add comments only when necessary to explain why, not what. The code should show what it does.
