@@ -1,6 +1,0 @@
-includes:
-  - builtin:security
-
-guidelines:
-  - label: custom-rule
-    description: Custom project-specific guideline for code quality.

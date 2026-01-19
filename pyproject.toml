@@ -30,9 +30,9 @@ build-backend = "hatchling.build"
 [tool.hatch.build.targets.wheel]
 packages = ["src/codeyak"]
 
-# Ensure guidelines are included in the package
+# Ensure prebuilt guidelines are included in the package
 [tool.hatch.build.targets.wheel.force-include]
-"src/codeyak/guidelines" = "codeyak/guidelines"
+"src/codeyak/prebuilt" = "codeyak/prebuilt"
 
 [tool.pytest.ini_options]
 minversion = "8.0"

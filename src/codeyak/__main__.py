@@ -1,10 +1,14 @@
 import sys
 import os
 from .config import get_settings
-from .adapters.vcs.gitlab import GitLabAdapter
-from .adapters.llm.azure import AzureAdapter
-from .core.engine import ReviewEngine
-from .core.guidelines import GuidelinesManager
+from codeyak.infrastructure import GitLabAdapter, AzureAdapter
+from codeyak.services import (
+    CodeReviewer,
+    GuidelinesProvider,
+    CodeProvider,
+    CodeReviewContextBuilder,
+    FeedbackPublisher,
+)
 
 def log_settings():
     # Log all settings for debugging
@@ -58,18 +62,23 @@ def main():
         print(f"❌ Configuration Error: {e}")
         sys.exit(1)
 
-    # 3. Instantiate Guidelines Manager
-    guidelines_manager = GuidelinesManager()
+    # 3. Instantiate Services
+    context = CodeReviewContextBuilder()
+    guidelines = GuidelinesProvider(vcs)
+    code = CodeProvider(vcs)
+    feedback = FeedbackPublisher(vcs)
 
-    # 4. Instantiate Engine (The Brain)
-    bot = ReviewEngine(
-        vcs=vcs,
+    # 4. Instantiate Reviewer (The Brain)
+    bot = CodeReviewer(
+        context=context,
+        guidelines=guidelines,
+        code=code,
+        feedback=feedback,
         llm=llm,
-        guidelines=guidelines_manager
     )
 
     # 5. Run!
-    bot.run(mr_id)
+    bot.review_merge_request(mr_id)
 
 if __name__ == "__main__":
     main()

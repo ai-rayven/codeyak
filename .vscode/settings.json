@@ -4,5 +4,10 @@
   "python.testing.pytestArgs": [
     "tests"
   ],
-  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python"
+  "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+  "python.testing.pytestPath": "uv",
+  "python.testing.pytestExtraArgs": [
+    "run",
+    "pytest"
+  ]
 }

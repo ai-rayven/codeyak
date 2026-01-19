@@ -1,1 +1,0 @@
-"""Tests for CodeYak package."""

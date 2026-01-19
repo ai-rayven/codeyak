@@ -5,10 +5,14 @@
       "label": "Run All Tests",
       "type": "shell",
       "command": "uv run pytest",
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
       "group": "test",
       "presentation": {
         "reveal": "always",
-        "panel": "dedicated"
+        "panel": "dedicated",
+        "focus": true
       },
       "problemMatcher": []
     },
