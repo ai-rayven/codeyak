@@ -3,7 +3,7 @@ from typing import List, Optional, Dict
 from gitlab.v4.objects import ProjectMergeRequest
 
 from ...protocols import VCSClient
-from ...domain.models import FileDiff, GuidelineViolation, MRComment
+from ...domain.models import FileDiff, GuidelineViolation, MRComment, Commit
 from ...domain.exceptions import LineNotInDiffError, VCSCommentError, VCSFetchCommentsError
 
 class GitLabAdapter(VCSClient):
@@ -205,6 +205,39 @@ class GitLabAdapter(VCSClient):
             raise VCSFetchCommentsError(f"Failed to fetch comments: {e}") from e
         except Exception as e:
             raise VCSFetchCommentsError(f"Unexpected error fetching comments: {e}") from e
+
+    def get_commits(self, mr_id: str) -> List[Commit]:
+        """
+        Fetch all commits from the merge request.
+
+        Returns:
+            List of Commit objects with message, author, and timestamp
+
+        Raises:
+            VCSFetchCommentsError: When fetching commits fails
+        """
+        mr = self._get_mr(mr_id)
+
+        try:
+            # Fetch commits using python-gitlab API
+            commits_data = mr.commits()
+
+            commits = []
+            for commit in commits_data:
+                commits.append(Commit(
+                    sha=commit.attributes['id'],
+                    message=commit.attributes['message'],
+                    author=commit.attributes.get('author_name', 'unknown'),
+                    created_at=commit.attributes.get('created_at', '')
+                ))
+
+            print(f"📝 Fetched {len(commits)} commits from MR {mr_id}")
+            return commits
+
+        except gitlab.exceptions.GitlabGetError as e:
+            raise VCSFetchCommentsError(f"Failed to fetch commits: {e}") from e
+        except Exception as e:
+            raise VCSFetchCommentsError(f"Unexpected error fetching commits: {e}") from e
 
     def get_file_content(self, mr_id: str, file_path: str) -> Optional[str]:
         """

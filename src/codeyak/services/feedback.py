@@ -77,12 +77,15 @@ class FeedbackPublisher:
             total_original_violations: Total number of violations before filtering duplicates
             total_filtered_violations: Total number of violations after filtering duplicates
         """
+        if total_filtered_violations > 0:
+            return
+
         if total_original_violations == 0:
-            success_message = "Nothing major found. Code looks good."
-            try:
-                self.vcs_client.post_general_comment(merge_request_id, success_message)
-                print("No violations found - posted success comment.")
-            except VCSCommentError as e:
-                print(f"⚠️  Could not post success comment: {e}")
+            message = "Nothing major found. Code looks good."
         elif total_filtered_violations == 0:
-            print("ℹ️ All detected violations were already reported in existing comments.")
+            message = "No major violations found or were already reported in previous comments."
+
+        try:
+            self.vcs_client.post_general_comment(merge_request_id, message)
+        except VCSCommentError as e:
+            print(f"⚠️  Could not post success comment: {e}")

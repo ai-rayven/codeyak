@@ -178,11 +178,41 @@ class MRComment(BaseModel):
 
 class MergeRequest(BaseModel):
     """
-    Represents a merge request with its file diffs and comments.
+    Represents a merge request with its file diffs, comments, and commits.
     """
     id: str = Field(..., description="Merge request ID")
     file_diffs: List[FileDiff] = Field(default_factory=list, description="List of file diffs in the MR")
     comments: List[MRComment] = Field(default_factory=list, description="List of comments on the MR")
+    commits: List['Commit'] = Field(default_factory=list, description="List of commits in the MR")
+
+
+class Commit(BaseModel):
+    """Represents a single commit in the merge request."""
+    sha: str = Field(..., description="Commit SHA")
+    message: str = Field(..., description="Commit message")
+    author: str = Field(..., description="Commit author username")
+    created_at: str = Field(..., description="Commit timestamp")
+
+
+class MRSummary(BaseModel):
+    """
+    AI-generated summary of merge request changes.
+
+    Analyzes commit messages and diffs to provide an overview
+    of what was accomplished in the MR.
+    """
+    overview: str = Field(
+        ...,
+        description="High-level summary of what was accomplished (2-3 sentences)"
+    )
+    key_changes: List[str] = Field(
+        default_factory=list,
+        description="List of 3-5 major changes or features added"
+    )
+    scope: str = Field(
+        ...,
+        description="Scope: 'feature', 'bugfix', 'refactor', 'documentation', 'test', or 'mixed'"
+    )
 
 # --- Review Results Domain Models ---
 

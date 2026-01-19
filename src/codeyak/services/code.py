@@ -26,7 +26,7 @@ class CodeProvider:
         extension_filters: List[str]
     ) -> MergeRequest:
         """
-        Fetch a merge request with its file diffs and comments.
+        Fetch a merge request with its file diffs, comments, and commits.
 
         Args:
             merge_request_id: The ID of the merge request to fetch
@@ -34,7 +34,7 @@ class CodeProvider:
                              If empty, all files are included
 
         Returns:
-            MergeRequest object containing filtered file diffs and all comments
+            MergeRequest object containing filtered file diffs, all comments, and commits
         """
         # Fetch all file diffs from VCS
         all_diffs = self.vcs_client.get_diff(merge_request_id)
@@ -45,11 +45,15 @@ class CodeProvider:
         # Fetch all comments
         comments = self.vcs_client.get_comments(merge_request_id)
 
+        # Fetch all commits
+        commits = self.vcs_client.get_commits(merge_request_id)
+
         # Build and return MergeRequest
         return MergeRequest(
             id=merge_request_id,
             file_diffs=filtered_diffs,
-            comments=comments
+            comments=comments,
+            commits=commits
         )
 
     def _filter_by_extension(

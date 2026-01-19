@@ -6,6 +6,7 @@ from .guidelines import GuidelinesProvider
 from .context import CodeReviewContextBuilder
 from .code import CodeProvider
 from .feedback import FeedbackPublisher
+from .summary import SummaryGenerator
 
 # Known code file extensions to filter in merge requests
 CODE_FILE_EXTENSIONS = [
@@ -51,13 +52,15 @@ class CodeReviewer:
         code: CodeProvider,
         guidelines: GuidelinesProvider,
         llm: LLMClient,
-        feedback: FeedbackPublisher
+        feedback: FeedbackPublisher,
+        summary: SummaryGenerator
     ):
         self.context = context
         self.code = code
         self.llm = llm
         self.guidelines = guidelines
         self.feedback = feedback
+        self.summary = summary
 
     def review_merge_request(self, merge_request_id: str):
         print(f"Starting review for MR {merge_request_id}...")
@@ -70,6 +73,9 @@ class CodeReviewer:
             merge_request_id=merge_request_id,
             extension_filters=CODE_FILE_EXTENSIONS
         )
+
+        # Generate and post summary BEFORE reviews
+        self._generate_and_post_summary(merge_request)
 
         # 4. Run focused review for each guideline set
         total_original_violations = 0
@@ -154,3 +160,23 @@ class CodeReviewer:
             print(f"     Filtered {filtered_count} duplicate violations")
 
         return ReviewResult(violations=filtered_violations), original_count
+
+    def _generate_and_post_summary(self, merge_request: MergeRequest):
+        """
+        Generate and post MR summary.
+
+        Args:
+            merge_request: MergeRequest object with diffs, commits, and id
+        """
+        print(f"\n{'='*80}")
+        print("📋 Generating MR summary...")
+        print(f"{'='*80}")
+
+        # Generate summary using LLM
+        summary = self.summary.generate_summary(merge_request)
+
+        # Format and post as general comment
+        print(f"Summary: {summary}")
+
+        self.feedback.vcs_client.post_general_comment(merge_request.id, summary)
+        print("✅ Summary posted")

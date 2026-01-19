@@ -6,7 +6,7 @@ These define the contracts that adapters must implement.
 
 from typing import List, Type, TypeVar, Any, Dict, Protocol
 from pydantic import BaseModel
-from ..domain.models import FileDiff, GuidelineViolation, MRComment, LLMResponse
+from ..domain.models import FileDiff, GuidelineViolation, MRComment, LLMResponse, Commit
 
 # "T" means "Any Pydantic Model"
 T = TypeVar("T", bound=BaseModel)
@@ -32,6 +32,21 @@ class VCSClient(Protocol):
 
         Raises:
             VCSFetchCommentsError: When fetching comments fails
+        """
+        ...
+
+    def get_commits(self, mr_id: str) -> List[Commit]:
+        """
+        Fetch all commits from the merge request.
+
+        Args:
+            mr_id: Merge request ID
+
+        Returns:
+            List of Commit objects with sha, message, author, and created_at
+
+        Raises:
+            VCSFetchCommentsError: When fetching commits fails
         """
         ...
 

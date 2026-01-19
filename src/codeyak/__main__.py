@@ -8,6 +8,7 @@ from codeyak.services import (
     CodeProvider,
     CodeReviewContextBuilder,
     FeedbackPublisher,
+    SummaryGenerator,
 )
 
 def log_settings():
@@ -67,6 +68,7 @@ def main():
     guidelines = GuidelinesProvider(vcs)
     code = CodeProvider(vcs)
     feedback = FeedbackPublisher(vcs)
+    summary = SummaryGenerator(llm)
 
     # 4. Instantiate Reviewer (The Brain)
     bot = CodeReviewer(
@@ -75,6 +77,7 @@ def main():
         code=code,
         feedback=feedback,
         llm=llm,
+        summary=summary,
     )
 
     # 5. Run!
