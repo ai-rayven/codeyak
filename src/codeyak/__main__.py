@@ -57,6 +57,7 @@ def main():
             secret_key=get_settings().LANGFUSE_SECRET_KEY,
             public_key=get_settings().LANGFUSE_PUBLIC_KEY,
             host=get_settings().LANGFUSE_HOST,
+            debug=True
         )
         print("✅ Langfuse tracing enabled")
     else:
