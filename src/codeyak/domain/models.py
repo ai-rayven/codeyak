@@ -181,6 +181,8 @@ class MergeRequest(BaseModel):
     Represents a merge request with its file diffs, comments, and commits.
     """
     id: str = Field(..., description="Merge request ID")
+    project_name: str = Field(..., description="Project name/identifier")
+    author: str = Field(..., description="Username of the user who created the MR")
     file_diffs: List[FileDiff] = Field(default_factory=list, description="List of file diffs in the MR")
     comments: List[MRComment] = Field(default_factory=list, description="List of comments on the MR")
     commits: List['Commit'] = Field(default_factory=list, description="List of commits in the MR")

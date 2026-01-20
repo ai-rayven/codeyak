@@ -13,6 +13,14 @@ T = TypeVar("T", bound=BaseModel)
 
 
 class VCSClient(Protocol):
+    def get_project_name(self) -> str:
+        """Get the project name/identifier."""
+        ...
+
+    def get_mr_author(self, mr_id: str) -> str:
+        """Get the username of the user who created the merge request."""
+        ...
+
     def get_diff(self, mr_id: str) -> List[FileDiff]:
         ...
 

@@ -18,6 +18,15 @@ class GitLabAdapter(VCSClient):
             self._mr_cache[mr_iid] = self.project.mergerequests.get(mr_iid)
         return self._mr_cache[mr_iid]
 
+    def get_project_name(self) -> str:
+        """Get the project's path with namespace (e.g., 'group/project')."""
+        return self.project.path_with_namespace
+
+    def get_mr_author(self, mr_id: str) -> str:
+        """Get the username of the user who created the merge request."""
+        mr = self._get_mr(mr_id)
+        return mr.author.get('username', 'unknown')
+
     def get_diff(self, mr_id: str) -> List[FileDiff]:
         mr = self._get_mr(mr_id)
 

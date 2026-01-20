@@ -48,9 +48,15 @@ class CodeProvider:
         # Fetch all commits
         commits = self.vcs_client.get_commits(merge_request_id)
 
+        # Get project name and author
+        project_name = self.vcs_client.get_project_name()
+        author = self.vcs_client.get_mr_author(merge_request_id)
+
         # Build and return MergeRequest
         return MergeRequest(
             id=merge_request_id,
+            project_name=project_name,
+            author=author,
             file_diffs=filtered_diffs,
             comments=comments,
             commits=commits
