@@ -29,4 +29,4 @@ guidelines:
 
   # Error Handling
   - label: handle-exceptions
-    description: Do not catch exceptions unless you are handling them. Let them bubble up. It is ok to swallow general exceptions and log in fire and forget use cases.
+    description: Do not catch exceptions unless you are handling them. Let them bubble up. It is ok to swallow general exceptions and log in fire and forget use cases. It is also ok to catch, add context and rethrow exception.
