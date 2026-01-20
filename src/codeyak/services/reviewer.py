@@ -203,7 +203,11 @@ class CodeReviewer:
         if generation:
             generation.update(
                 model=output.model,
-                output=output.result.model_dump_json()
+                output=output.result.model_dump_json(),
+                usage_details={
+                    "input": output.token_usage.prompt_tokens,
+                    "output": output.token_usage.completion_tokens,
+                }
             )
             generation.end()
 

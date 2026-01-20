@@ -55,6 +55,10 @@ class SummaryGenerator:
             generation.update(
                 model=response.model,
                 output=response.result.model_dump_json(),
+                usage_details={
+                    "input": response.token_usage.prompt_tokens,
+                    "output": response.token_usage.completion_tokens,
+                }
             )
             generation.end()
 
