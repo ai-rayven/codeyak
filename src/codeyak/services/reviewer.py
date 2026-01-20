@@ -109,7 +109,7 @@ class CodeReviewer:
                 print(f"🔍 Running focused review with {filename} ({len(guidelines)} guidelines)")
                 print(f"{'='*80}")
 
-                result = self._get_review_result_traced(merge_request, guidelines, trace)
+                result = self._get_review_result_traced(merge_request, filename, guidelines, trace)
                 print(result.model_dump_json())
 
                 # Filter duplicates and track both counts
@@ -165,6 +165,7 @@ class CodeReviewer:
     def _get_review_result_traced(
         self,
         merge_request: MergeRequest,
+        guidelines_filename: str,
         guidelines: List[Guideline],
         trace
     ) -> ReviewResult:
@@ -190,7 +191,7 @@ class CodeReviewer:
         generation = None
         if trace:
             generation = trace.start_generation(
-                name="generate_guideline_violations",
+                name=f"generate_guideline_violations::{guidelines_filename}",
                 input=messages,  # Full ChatML format
             )
 
@@ -201,7 +202,7 @@ class CodeReviewer:
         if generation:
             generation.update(
                 model=output.model,
-                output=output.result.model_dump()
+                output=output.result.model_dump_json()
             )
             generation.end()
 

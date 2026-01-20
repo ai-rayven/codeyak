@@ -22,13 +22,26 @@ class CodeReviewContextBuilder:
         Returns:
             List of message dicts with 'role' and 'content' keys
         """
-        system_content = self._build_system_prompt(guidelines, existing_comments)
-        user_content = self._build_user_prompt(diffs, existing_comments)
+        messages = []
 
-        return [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": user_content}
-        ]
+        # System message with guidelines
+        system_content = self._build_system_prompt(guidelines, existing_comments)
+        messages.append({"role": "system", "content": system_content})
+
+        # Separate user message(s) for existing comments
+        if existing_comments:
+            comments_content = self._format_existing_comments(existing_comments)
+            messages.append({"role": "user", "content": comments_content})
+
+        # Separate user message for each file + diff
+        for diff in diffs:
+            file_content = self._format_file_diff(diff)
+            messages.append({"role": "user", "content": file_content})
+
+        # Final user message
+        messages.append({"role": "user", "content": "Review the provided file changes"})
+
+        return messages
 
     def _build_system_prompt(
         self,
@@ -62,25 +75,6 @@ class CodeReviewContextBuilder:
                 "Use them as context but still report any violations you find. "
                 "The system will deduplicate overlapping comments.\n"
             )
-
-        return content
-
-    def _build_user_prompt(
-        self,
-        diffs: List[FileDiff],
-        existing_comments: Optional[List[MRComment]] = None
-    ) -> str:
-        """Build the user prompt with context and code."""
-        content = ""
-
-        # Add existing comments section if available
-        if existing_comments:
-            content += self._format_existing_comments(existing_comments)
-
-        # Add file changes
-        content += "Review the following file changes:\n\n"
-        for diff in diffs:
-            content += self._format_file_diff(diff)
 
         return content
 

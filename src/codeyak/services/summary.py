@@ -54,7 +54,7 @@ class SummaryGenerator:
         if generation:
             generation.update(
                 model=response.model,
-                output=summary,
+                output=response.result.model_dump_json(),
             )
             generation.end()
 
