@@ -1,7 +1,7 @@
 from typing import List
 from contextlib import nullcontext
 from codeyak.protocols import LLMClient
-from codeyak.domain.models import Guideline, MergeRequest, ReviewResult, MRComment
+from codeyak.domain.models import ChangeSummary, Guideline, MergeRequest, ReviewResult, MRComment
 from langfuse import propagate_attributes
 
 from .guidelines import GuidelinesProvider
@@ -109,7 +109,7 @@ class CodeReviewer:
                 print(f"🔍 Running focused review with {filename} ({len(guidelines)} guidelines)")
                 print(f"{'='*80}")
 
-                result = self._get_review_result_traced(merge_request, filename, guidelines, trace)
+                result = self._get_review_result_traced(merge_request, summary, filename, guidelines, trace)
                 print(result.model_dump_json())
 
                 # Filter duplicates and track both counts
@@ -165,6 +165,7 @@ class CodeReviewer:
     def _get_review_result_traced(
         self,
         merge_request: MergeRequest,
+        change_summary: ChangeSummary,
         guidelines_filename: str,
         guidelines: List[Guideline],
         trace
@@ -180,11 +181,11 @@ class CodeReviewer:
         Returns:
             ReviewResult: The generated review result from the LLM
         """
-        # Build messages with comment context
+        # Build messages with full context
         messages = self.context.build_review_messages(
-            merge_request.file_diffs,
-            guidelines,
-            merge_request.comments
+            merge_request,
+            change_summary,
+            guidelines
         )
 
         # Start generation span if tracing enabled

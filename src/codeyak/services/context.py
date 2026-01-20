@@ -1,5 +1,5 @@
 from typing import List, Optional
-from codeyak.domain.models import FileDiff, Guideline, MRComment
+from codeyak.domain.models import ChangeSummary, FileDiff, Guideline, MRComment, MergeRequest
 
 
 class CodeReviewContextBuilder:
@@ -7,9 +7,9 @@ class CodeReviewContextBuilder:
 
     def build_review_messages(
         self,
-        diffs: List[FileDiff],
+        merge_request: MergeRequest,
+        change_summary: ChangeSummary,
         guidelines: List[Guideline],
-        existing_comments: Optional[List[MRComment]] = None
     ) -> List[dict]:
         """
         Build structured messages for code review analysis.
@@ -22,11 +22,20 @@ class CodeReviewContextBuilder:
         Returns:
             List of message dicts with 'role' and 'content' keys
         """
+        existing_comments = merge_request.comments
+        diffs = merge_request.file_diffs
+
         messages = []
 
         # System message with guidelines
         system_content = self._build_system_prompt(guidelines, existing_comments)
         messages.append({"role": "system", "content": system_content})
+
+        # TODO: Look for README.md, AGENTS.md or CLAUDE.md to get context for the project and add also
+
+        # Change summary
+        summary_content = self._format_change_summary(change_summary)
+        messages.append({"role": "user", "content": summary_content})
 
         # Separate user message(s) for existing comments
         if existing_comments:
@@ -119,4 +128,14 @@ class CodeReviewContextBuilder:
         content += diff.diff_content
         content += "\n\n"
 
+        return content
+
+    def _format_change_summary(self, change_summary: ChangeSummary) -> str:
+        """Format the change summary for the LLM."""
+        content = "=== CHANGE SUMMARY ===\n\n"
+        content += f"**Scope**: {change_summary.scope}\n\n"
+        content += f"**Summary**:\n{change_summary.summary}\n\n"
+        content += "Use this high-level context to understand the purpose of the changes "
+        content += "you are reviewing. The detailed file diffs follow below.\n\n"
+        content += "=== END CHANGE SUMMARY ===\n\n"
         return content
