@@ -6,8 +6,8 @@ commit messages and file diffs using an LLM.
 """
 
 from typing import List
-from ..protocols import LLMClient
-from ..domain.models import MergeRequest, MRSummary
+from codeyak.protocols import LLMClient
+from codeyak.domain import ChangeSummaryStructuredOutput, ChangeSummary, MergeRequest
 
 
 class SummaryGenerator:
@@ -16,27 +16,49 @@ class SummaryGenerator:
 
     Args:
         llm: LLM client for generating summaries
+        langfuse: Langfuse client for tracing (optional)
     """
 
-    def __init__(self, llm: LLMClient):
+    def __init__(self, llm: LLMClient, langfuse=None):
         self.llm = llm
+        self.langfuse = langfuse
 
-    def generate_summary(self, merge_request: MergeRequest) -> str:
+    def generate_summary(self, merge_request: MergeRequest, trace=None) -> ChangeSummary:
         """
         Generate a summary of the merge request changes.
 
         Args:
             merge_request: The merge request to summarize
+            trace: Langfuse trace object (None if tracing disabled)
 
         Returns:
-            MRSummary object with overview, key changes, and metadata
+            Formatted summary comment string
         """
         messages = self._build_summary_messages(merge_request)
 
-        # Use LLM to generate structured summary
-        response = self.llm.generate(messages, response_model=MRSummary)
+        # Start generation span if tracing enabled
+        generation = None
+        if trace:
+            generation = trace.start_generation(
+                name="generate_change_summary",
+                input=messages,  # Full ChatML format
+            )
 
-        return self._format_summary_comment(response.result, len(merge_request.file_diffs))
+        # Use LLM to generate structured summary
+        response = self.llm.generate(messages, response_model=ChangeSummaryStructuredOutput)
+
+        # Format the summary
+        summary = self._format_summary_comment(response.result, len(merge_request.file_diffs))
+
+        # End generation with output
+        if generation:
+            generation.update(
+                model=response.model,
+                output=summary,
+            )
+            generation.end()
+
+        return ChangeSummary(summary, response.result.scope)
 
     def _build_summary_messages(self, merge_request: MergeRequest) -> List[dict]:
         """Build messages for summary generation."""
@@ -78,7 +100,7 @@ class SummaryGenerator:
 
         return content
 
-    def _format_summary_comment(self, summary: MRSummary, files_count: int) -> str:
+    def _format_summary_comment(self, summary: ChangeSummaryStructuredOutput, files_count: int) -> str:
         """
         Format the summary as a markdown comment for posting to the MR.
 
@@ -90,8 +112,8 @@ class SummaryGenerator:
             Formatted markdown string
         """
         comment = "# 📋 Merge Request Summary\n\n"
-        comment += f"**Scope**: {summary.scope.title()}\n"
-        comment += f"**Files Changed**: {files_count}\n\n"
+        comment += f"**Scope**: {summary.scope.title()}\n\n"
+        comment += f"**Files Reviewed**: {files_count}\n\n"
         comment += f"## Overview\n{summary.overview}\n\n"
 
         if summary.key_changes:

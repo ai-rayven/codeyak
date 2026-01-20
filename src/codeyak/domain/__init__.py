@@ -11,6 +11,9 @@ from .models import (
     MRComment,
     GuidelineViolation,
     ReviewResult,
+    ChangeSummary,
+    ChangeSummaryStructuredOutput,
+    MergeRequest
 )
 from .exceptions import (
     LineNotInDiffError,
@@ -27,8 +30,12 @@ __all__ = [
     "GuidelineSetInfo",
     "FileDiff",
     "MRComment",
+    "MergeRequest",
     "GuidelineViolation",
     "ReviewResult",
+    "ChangeSummary",
+    "ChangeSummaryStructuredOutput",
+
     # Exceptions
     "LineNotInDiffError",
     "VCSCommentError",

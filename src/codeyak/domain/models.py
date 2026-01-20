@@ -4,6 +4,7 @@ Domain models for CodeYak.
 Contains all core data structures used across the application.
 """
 
+from dataclasses import dataclass
 from typing import List, Optional, TypeVar, Generic
 from pydantic import BaseModel, Field, field_validator
 from pathlib import Path
@@ -196,7 +197,7 @@ class Commit(BaseModel):
     created_at: str = Field(..., description="Commit timestamp")
 
 
-class MRSummary(BaseModel):
+class ChangeSummaryStructuredOutput(BaseModel):
     """
     AI-generated summary of merge request changes.
 
@@ -215,6 +216,11 @@ class MRSummary(BaseModel):
         ...,
         description="Scope: 'feature', 'bugfix', 'refactor', 'documentation', 'test', or 'mixed'"
     )
+
+@dataclass
+class ChangeSummary:
+    summary: str
+    scope: str
 
 # --- Review Results Domain Models ---
 

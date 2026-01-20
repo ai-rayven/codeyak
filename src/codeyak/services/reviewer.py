@@ -1,6 +1,8 @@
 from typing import List
+from contextlib import nullcontext
 from codeyak.protocols import LLMClient
 from codeyak.domain.models import Guideline, MergeRequest, ReviewResult, MRComment
+from langfuse import propagate_attributes
 
 from .guidelines import GuidelinesProvider
 from .context import CodeReviewContextBuilder
@@ -53,7 +55,8 @@ class CodeReviewer:
         guidelines: GuidelinesProvider,
         llm: LLMClient,
         feedback: FeedbackPublisher,
-        summary: SummaryGenerator
+        summary: SummaryGenerator,
+        langfuse=None,
     ):
         self.context = context
         self.code = code
@@ -61,10 +64,12 @@ class CodeReviewer:
         self.guidelines = guidelines
         self.feedback = feedback
         self.summary = summary
+        self.langfuse = langfuse
 
     def review_merge_request(self, merge_request_id: str):
         print(f"Starting review for MR {merge_request_id}...")
 
+        # Load data first
         guideline_sets = self.guidelines.load_guidelines_from_vcs(
             merge_request_id=merge_request_id
         )
@@ -74,27 +79,61 @@ class CodeReviewer:
             extension_filters=CODE_FILE_EXTENSIONS
         )
 
-        # Generate and post summary BEFORE reviews
-        self._generate_and_post_summary(merge_request)
+        # Start Langfuse trace if enabled
+        trace = None
+        if self.langfuse:
+            trace = self.langfuse.start_span(
+                name="review_code",
+                input={"file_count": len(merge_request.file_diffs)},
+                metadata={"merge_request_id": merge_request.id},
+            )
 
-        # 4. Run focused review for each guideline set
-        total_original_violations = 0
-        total_filtered_violations = 0
+        # Use propagate_attributes to propagate user_id, session_id, and tags to all child observations
+        propagate_context = (
+            propagate_attributes(
+                user_id=merge_request.author,
+                session_id=merge_request.id
+            ) if trace else nullcontext()
+        )
 
-        for filename, guidelines in guideline_sets.items():
-            print(f"\n{'='*80}")
-            print(f"🔍 Running focused review with {filename} ({len(guidelines)} guidelines)")
-            print(f"{'='*80}")
+        with propagate_context:
+            # Generate and post summary BEFORE reviews
+            summary = self._generate_and_post_summary(merge_request, trace)
 
-            result = self._get_review_result(merge_request, guidelines)
-            print(result.model_dump_json())
+            # Run focused review for each guideline set
+            total_original_violations = 0
+            total_filtered_violations = 0
 
-            # Filter duplicates and track both counts
-            filtered_result, original_count = self._filter_existing_violations(result, merge_request.comments)
-            total_original_violations += original_count
+            for filename, guidelines in guideline_sets.items():
+                print(f"\n{'='*80}")
+                print(f"🔍 Running focused review with {filename} ({len(guidelines)} guidelines)")
+                print(f"{'='*80}")
 
-            violations_count = self.feedback.post_feedback(merge_request_id, filtered_result)
-            total_filtered_violations += violations_count
+                result = self._get_review_result_traced(merge_request, guidelines, trace)
+                print(result.model_dump_json())
+
+                # Filter duplicates and track both counts
+                filtered_result, original_count = self._filter_existing_violations(
+                    result,
+                    merge_request.comments
+                )
+                total_original_violations += original_count
+
+                violations_count = self.feedback.post_feedback(
+                    merge_request_id,
+                    filtered_result
+                )
+                total_filtered_violations += violations_count
+
+            # Update trace with results
+            if trace:
+                # Add no_violations tag if applicable
+                tags = [summary.scope, merge_request.project_name]
+                if total_filtered_violations == 0:
+                    tags.append("no_violations")
+                # Set output and tags on trace
+                trace.update_trace(output={"violation_count": total_filtered_violations}, tags=tags)
+                trace.end()
 
         # Post review summary
         print(f"\n{'='*80}")
@@ -120,6 +159,51 @@ class CodeReviewer:
         messages = self.context.build_review_messages(merge_request.file_diffs, guidelines, merge_request.comments)
 
         output = self.llm.generate(messages, response_model=ReviewResult)
+
+        return output.result
+
+    def _get_review_result_traced(
+        self,
+        merge_request: MergeRequest,
+        guidelines: List[Guideline],
+        trace
+    ) -> ReviewResult:
+        """
+        Generate review result using LLM with Langfuse tracing.
+
+        Args:
+            merge_request: The merge request containing file diffs and comments
+            guidelines: List of guidelines to apply during review
+            trace: Langfuse trace object (None if tracing disabled)
+
+        Returns:
+            ReviewResult: The generated review result from the LLM
+        """
+        # Build messages with comment context
+        messages = self.context.build_review_messages(
+            merge_request.file_diffs,
+            guidelines,
+            merge_request.comments
+        )
+
+        # Start generation span if tracing enabled
+        generation = None
+        if trace:
+            generation = trace.start_generation(
+                name="generate_guideline_violations",
+                input=messages,  # Full ChatML format
+            )
+
+        # Call LLM
+        output = self.llm.generate(messages, response_model=ReviewResult)
+
+        # End generation with output
+        if generation:
+            generation.update(
+                model=output.model,
+                output=output.result.model_dump()
+            )
+            generation.end()
 
         return output.result
 
@@ -161,22 +245,25 @@ class CodeReviewer:
 
         return ReviewResult(violations=filtered_violations), original_count
 
-    def _generate_and_post_summary(self, merge_request: MergeRequest):
+    def _generate_and_post_summary(self, merge_request: MergeRequest, trace=None):
         """
         Generate and post MR summary.
 
         Args:
             merge_request: MergeRequest object with diffs, commits, and id
+            trace: Langfuse trace object (None if tracing disabled)
         """
         print(f"\n{'='*80}")
         print("📋 Generating MR summary...")
         print(f"{'='*80}")
 
-        # Generate summary using LLM
-        summary = self.summary.generate_summary(merge_request)
+        # Generate summary using LLM (with tracing)
+        summary = self.summary.generate_summary(merge_request, trace)
 
         # Format and post as general comment
-        print(f"Summary: {summary}")
+        print(f"Summary: {summary.summary}")
 
-        self.feedback.vcs_client.post_general_comment(merge_request.id, summary)
+        self.feedback.vcs_client.post_general_comment(merge_request.id, summary.summary)
         print("✅ Summary posted")
+
+        return summary

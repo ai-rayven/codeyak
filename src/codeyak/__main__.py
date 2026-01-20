@@ -10,6 +10,7 @@ from codeyak.services import (
     FeedbackPublisher,
     SummaryGenerator,
 )
+from langfuse import Langfuse
 
 def log_settings():
     # Log all settings for debugging
@@ -44,6 +45,23 @@ def main():
 
     log_settings()
 
+    # Initialize Langfuse if configured
+    langfuse_enabled = bool(
+        get_settings().LANGFUSE_SECRET_KEY and
+        get_settings().LANGFUSE_PUBLIC_KEY
+    )
+
+    langfuse = None
+    if langfuse_enabled:
+        langfuse = Langfuse(
+            secret_key=get_settings().LANGFUSE_SECRET_KEY,
+            public_key=get_settings().LANGFUSE_PUBLIC_KEY,
+            host=get_settings().LANGFUSE_HOST,
+        )
+        print("✅ Langfuse tracing enabled")
+    else:
+        print("⚠️ Langfuse tracing disabled (keys not configured)")
+
     # 2. Instantiate Adapters (The Plumbing)
     # We explicitly inject the dependencies here.
     try:
@@ -68,7 +86,7 @@ def main():
     guidelines = GuidelinesProvider(vcs)
     code = CodeProvider(vcs)
     feedback = FeedbackPublisher(vcs)
-    summary = SummaryGenerator(llm)
+    summary = SummaryGenerator(llm, langfuse)
 
     # 4. Instantiate Reviewer (The Brain)
     bot = CodeReviewer(
@@ -78,10 +96,16 @@ def main():
         feedback=feedback,
         llm=llm,
         summary=summary,
+        langfuse=langfuse,
     )
 
     # 5. Run!
     bot.review_merge_request(mr_id)
+
+    # 6. Flush Langfuse traces
+    if langfuse:
+        print("Flushing Langfuse traces...")
+        langfuse.flush()
 
 if __name__ == "__main__":
     main()
