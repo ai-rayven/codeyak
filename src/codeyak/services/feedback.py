@@ -26,8 +26,8 @@ class FeedbackPublisher:
         Post all violations from a review result as comments on the merge request.
 
         Filters out low and medium confidence violations and only posts high confidence ones.
-        If posting an inline comment fails due to the line not being in the diff, it falls back
-        to posting a general comment.
+        If posting an inline comment fails due to the line not being in the diff, the comment
+        is skipped (only inline comments on actual diff lines are posted).
 
         Args:
             merge_request_id: Merge request ID to post comments to
@@ -48,13 +48,8 @@ class FeedbackPublisher:
                 self.vcs_client.post_comment(merge_request_id, violation)
                 posted_count += 1
             except LineNotInDiffError:
-                # Line not in diff - post as general comment instead
-                try:
-                    self.vcs_client.post_general_comment(merge_request_id, violation.to_general_comment())
-                    print(f"⚠️  Posted as general comment (line not in diff): {violation.file_path}:{violation.line_number}")
-                    posted_count += 1
-                except VCSCommentError as e:
-                    print(f"❌ Failed to post general comment: {e}")
+                # Line not in diff - skip this comment (only post inline comments)
+                print(f"⚠️  Skipping comment (line not in diff): {violation.file_path}:{violation.line_number}")
             except VCSCommentError as e:
                 # Other VCS error - report it but continue
                 print(f"❌ Failed to post comment: {e}")
