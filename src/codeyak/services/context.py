@@ -1,5 +1,11 @@
 from typing import List, Optional
-from codeyak.domain.models import ChangeSummary, FileDiff, Guideline, MRComment, MergeRequest
+from codeyak.domain.models import (
+    ChangeSummary,
+    FileDiff,
+    Guideline,
+    MRComment,
+    MergeRequest
+)
 
 
 class CodeReviewContextBuilder:
@@ -61,6 +67,7 @@ class CodeReviewContextBuilder:
         content = (
             "You are an automated code review agent. "
             "Your task is to contextually evaluate code changes against the provided guidelines.\n\n"
+            "Provide your findings in an easy to understand fashion with analogies if relevant to help developers understand the impact of the change."
             "Guidelines:\n"
         )
 
@@ -114,7 +121,7 @@ class CodeReviewContextBuilder:
         return content
 
     def _format_file_diff(self, diff: FileDiff) -> str:
-        """Format a single file diff."""
+        """Format a single file diff with line numbers."""
         content = f"--- FILE: {diff.file_path} ---\n"
 
         # Include full file if available (for context)
@@ -123,10 +130,10 @@ class CodeReviewContextBuilder:
             content += diff.full_content
             content += "\n```\n\n"
 
-        # Include diff (shows what changed)
+        # Include diff with line numbers (shows what changed)
         content += "CHANGES (what was modified):\n"
-        content += diff.diff_content
-        content += "\n\n"
+        content += diff.format_with_line_numbers()
+        content += "\n"
 
         return content
 

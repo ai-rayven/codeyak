@@ -128,7 +128,7 @@ class CodeReviewer:
             # Update trace with results
             if trace:
                 # Add no_violations tag if applicable
-                tags = [summary.scope, merge_request.project_name]
+                tags = [summary.scope.type.value, summary.scope.size.value, merge_request.project_name]
                 if total_filtered_violations == 0:
                     tags.append("no_violations")
                 # Set output and tags on trace

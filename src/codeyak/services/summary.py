@@ -69,7 +69,7 @@ class SummaryGenerator:
         system_prompt = (
             "You are an expert code reviewer analyzing a merge request. "
             "Your task is to generate a clear, concise summary of what was accomplished. "
-            "Focus on the 'what' and 'why' rather than implementation details.\n\n"
+            "Focus on the 'what' and 'why' rather than implementation details. Describe in a non formal tone but with engineering polish.\n\n"
             "Guidelines:\n"
             "1. Overview should be 2-3 sentences describing the main purpose\n"
             "2. Key changes should be 3-5 bullet points of major modifications\n"
@@ -98,7 +98,7 @@ class SummaryGenerator:
         for diff in merge_request.file_diffs:
             content += f"### {diff.file_path}\n"
             # Include diff but limit size to avoid token overflow
-            content += f"```diff\n{diff.diff_content}\n```\n\n"
+            content += f"```diff\n{diff.format_with_line_numbers()}\n```\n\n"
 
         content += "\nBased on this data, generate a summary of what was accomplished in this merge request."
 
@@ -115,8 +115,9 @@ class SummaryGenerator:
         Returns:
             Formatted markdown string
         """
-        comment = "# 📋 Merge Request Summary\n\n"
-        comment += f"**Scope**: {summary.scope.title()}\n\n"
+        comment = "# Change Summary\n\n"
+        comment += f"**Scope**: {summary.scope.type.title()} - {summary.scope.description}\n\n"
+        comment += f"**Size**: {summary.scope.size.title()}\n\n"
         comment += f"**Files Reviewed**: {files_count}\n\n"
         comment += f"## Overview\n{summary.overview}\n\n"
 

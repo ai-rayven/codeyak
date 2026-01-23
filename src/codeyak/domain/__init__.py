@@ -5,6 +5,9 @@ Contains all domain models and port interfaces with no external dependencies.
 """
 
 from .models import (
+    DiffHunk,
+    DiffLine,
+    DiffLineType,
     Guideline,
     GuidelineSetInfo,
     FileDiff,
@@ -26,6 +29,9 @@ from .exceptions import (
 
 __all__ = [
     # Models
+    "DiffHunk",
+    "DiffLine",
+    "DiffLineType",
     "Guideline",
     "GuidelineSetInfo",
     "FileDiff",

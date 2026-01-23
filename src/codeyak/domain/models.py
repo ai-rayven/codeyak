@@ -5,6 +5,7 @@ Contains all core data structures used across the application.
 """
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import List, Optional, TypeVar, Generic
 from pydantic import BaseModel, Field, field_validator
 from pathlib import Path
@@ -93,13 +94,80 @@ class GuidelineSetInfo(BaseModel):
 
 # --- VCS Domain Models ---
 
+class DiffLineType(str, Enum):
+    """Type of line in a diff hunk."""
+    CONTEXT = "context"    # Unchanged line (space prefix)
+    ADDITION = "addition"  # Added line (+ prefix)
+    DELETION = "deletion"  # Removed line (- prefix)
+
+
+class DiffLine(BaseModel):
+    """A single line in a diff hunk."""
+    line_number: Optional[int] = Field(
+        None,
+        description="New-file line number (None for deletions)"
+    )
+    type: DiffLineType
+    content: str = Field(..., description="Line content WITHOUT the prefix")
+
+
+class DiffHunk(BaseModel):
+    """A single hunk/chunk in a diff (one @@ block)."""
+    old_start: int
+    old_count: int
+    new_start: int
+    new_count: int
+    header: Optional[str] = Field(
+        None,
+        description="Context after @@ (e.g., 'def example():')"
+    )
+    lines: List[DiffLine]
+
+
 class FileDiff(BaseModel):
     """
-    The raw code changes to check.
+    The code changes to check, with both raw and structured representations.
     """
     file_path: str
-    diff_content: str
+    hunks: List[DiffHunk] = Field(
+        default_factory=list,
+        description="Structured parsed representation of diff"
+    )
     full_content: Optional[str] = None  # Full file content for context
+    raw_diff: Optional[str] = None  # Raw diff for debugging/other uses
+
+    def format_with_line_numbers(self) -> str:
+        """Format the diff with line numbers for easy reference by reviewers."""
+        if not self.hunks:
+            return self.raw_diff or ""
+
+        # Find max line number width for alignment
+        max_line_num = 0
+        for hunk in self.hunks:
+            for line in hunk.lines:
+                if line.line_number is not None:
+                    max_line_num = max(max_line_num, line.line_number)
+        line_width = len(str(max_line_num)) if max_line_num > 0 else 4
+
+        lines = []
+        for hunk in self.hunks:
+            # Format hunk header
+            header_text = f" {hunk.header}" if hunk.header else ""
+            lines.append(f"@@ -{hunk.old_start},{hunk.old_count} +{hunk.new_start},{hunk.new_count} @@{header_text}")
+
+            # Format each line with line number
+            for diff_line in hunk.lines:
+                if diff_line.type == DiffLineType.CONTEXT:
+                    line_num_str = str(diff_line.line_number).rjust(line_width)
+                    lines.append(f"{line_num_str} |  {diff_line.content}")
+                elif diff_line.type == DiffLineType.ADDITION:
+                    line_num_str = str(diff_line.line_number).rjust(line_width)
+                    lines.append(f"{line_num_str} | +{diff_line.content}")
+                elif diff_line.type == DiffLineType.DELETION:
+                    blank = " " * line_width
+                    lines.append(f"{blank} | -{diff_line.content}")
+
+        return "\n".join(lines)
 
 class MRComment(BaseModel):
     """
@@ -197,25 +265,35 @@ class Commit(BaseModel):
     created_at: str = Field(..., description="Commit timestamp")
 
 
-class ChangeSummaryStructuredOutput(BaseModel):
-    """
-    AI-generated summary of merge request changes.
+class ChangeType(str, Enum):
+    """Type of pull request based on primary purpose"""
+    FEATURE = "feature"
+    BUG_FIX = "bug_fix"
+    REFACTOR = "refactor"
+    INFRASTRUCTURE = "infrastructure"
+    DOCUMENTATION = "documentation"
+    MIXED = "mixed"
 
-    Analyzes commit messages and diffs to provide an overview
-    of what was accomplished in the MR.
-    """
-    overview: str = Field(
-        ...,
-        description="High-level summary of what was accomplished (2-3 sentences)"
-    )
-    key_changes: List[str] = Field(
-        default_factory=list,
-        description="List of 3-5 major changes or features added"
-    )
-    scope: str = Field(
-        ...,
-        description="Scope: 'feature', 'bugfix', 'refactor', 'documentation', 'test', or 'mixed'"
-    )
+
+class ChangeSize(str, Enum):
+    """Relative size and impact of the change"""
+    SMALL = "small"
+    MEDIUM = "medium"
+    LARGE = "large"
+
+class ChangeScope(BaseModel):
+    """Scope and impact details of the PR"""
+    type: ChangeType = Field(description="Primary purpose of the PR")
+    size: ChangeSize = Field(description="Relative size/impact of the change")
+    description: str = Field(description="Very concise description about what parts of the system were affected like frontend, backend, db etc")
+
+
+class ChangeSummaryStructuredOutput(BaseModel):
+    """Structured summary of a pull request"""
+    overview: str = Field(description="High-level summary of what was added or changed")
+    key_changes: list[str] = Field(description="List of specific technical changes made")
+    scope: ChangeScope
+
 
 @dataclass
 class ChangeSummary:
