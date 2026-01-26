@@ -4,7 +4,7 @@ Port interfaces (protocols) for external dependencies.
 These define the contracts that adapters must implement.
 """
 
-from typing import List, Type, TypeVar, Any, Dict, Protocol
+from typing import Any, Dict, List, Protocol, Type, TypeVar
 from pydantic import BaseModel
 from ..domain.models import FileDiff, GuidelineViolation, MRComment, LLMResponse, Commit
 
@@ -91,4 +91,38 @@ class LLMClient(Protocol):
         Returns:
             An LLMResponse containing the parsed result and metadata (token usage, model, provider, latency).
         """
+        ...
+
+
+class FeedbackPublisher(Protocol):
+    """Protocol for publishing review feedback."""
+
+    def post_feedback(self, review_result: Any) -> int:
+        """
+        Post all violations from a review result.
+
+        Args:
+            review_result: Review result containing violations to post
+
+        Returns:
+            Number of successfully posted violations
+        """
+        ...
+
+    def post_review_summary(
+        self,
+        total_original_violations: int,
+        total_filtered_violations: int
+    ) -> None:
+        """
+        Post a summary message about the review results.
+
+        Args:
+            total_original_violations: Total number of violations before filtering duplicates
+            total_filtered_violations: Total number of violations after filtering duplicates
+        """
+        ...
+
+    def post_general_comment(self, message: str) -> None:
+        """Post a general comment (not tied to a specific line)."""
         ...

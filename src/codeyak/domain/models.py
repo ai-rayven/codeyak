@@ -306,8 +306,8 @@ class GuidelineViolation(BaseModel):
     """
     A specific instance where code failed a Guideline.
     """
-    file_path: str
-    line_number: int
+    file_path: str = Field(..., description="The file path from the diff of the violation")
+    line_number: int = Field(..., description="The exact line number from the diff of the violation")
     guideline_id: str = Field(..., description="MUST match the ID of the provided Guideline.")
     reasoning: str = Field(..., description="Brief explanation of why this code violates the rule.")
     confidence: str = Field(

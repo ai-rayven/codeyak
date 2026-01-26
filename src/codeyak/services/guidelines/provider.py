@@ -367,3 +367,33 @@ class GuidelinesProvider:
         total_guidelines = sum(len(guidelines) for guidelines in guideline_sets.values())
         total_sets = len(guideline_sets)
         print(f"✅ Total: {total_guidelines} guidelines across {total_sets} guideline set(s)")
+
+    def load_guidelines_local(self) -> Dict[str, List[Guideline]]:
+        """
+        Load guideline sets from local filesystem only (no VCS fetch).
+
+        Loading strategy:
+        1. Check local .codeyak/ directory for YAML files
+        2. If no project files found, auto-load built-in 'default' guideline set
+
+        Each guideline set (file) becomes a separate review pass.
+
+        Returns:
+            Dict[str, List[Guideline]]: Map of display name to list of guidelines
+            Display names use format: "builtin/filename" or "project/filename"
+
+        Raises:
+            GuidelinesLoadError: If files are invalid or includes cannot be resolved
+        """
+        # Only scan local filesystem
+        project_yaml_files = self._scan_project_yaml_files()
+
+        if project_yaml_files:
+            guideline_sets = self._load_project_guidelines(project_yaml_files)
+        else:
+            guideline_sets = self._load_builtin_default()
+
+        self._validate_guideline_sets(guideline_sets)
+        self._print_loading_summary(guideline_sets)
+
+        return guideline_sets

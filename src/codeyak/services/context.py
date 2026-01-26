@@ -14,16 +14,16 @@ class CodeReviewContextBuilder:
     def build_review_messages(
         self,
         merge_request: MergeRequest,
-        change_summary: ChangeSummary,
+        change_summary: Optional[ChangeSummary],
         guidelines: List[Guideline],
     ) -> List[dict]:
         """
         Build structured messages for code review analysis.
 
         Args:
-            diffs: List of file diffs to review
+            merge_request: MergeRequest containing file diffs and comments
+            change_summary: Optional summary of changes (can be None for local reviews)
             guidelines: List of guidelines to check against
-            existing_comments: Optional list of existing MR comments for context
 
         Returns:
             List of message dicts with 'role' and 'content' keys
@@ -39,9 +39,10 @@ class CodeReviewContextBuilder:
 
         # TODO: Look for README.md, AGENTS.md or CLAUDE.md to get context for the project and add also
 
-        # Change summary
-        summary_content = self._format_change_summary(change_summary)
-        messages.append({"role": "user", "content": summary_content})
+        # Change summary (if available)
+        if change_summary:
+            summary_content = self._format_change_summary(change_summary)
+            messages.append({"role": "user", "content": summary_content})
 
         # Separate user message(s) for existing comments
         if existing_comments:
@@ -67,7 +68,8 @@ class CodeReviewContextBuilder:
         content = (
             "You are an automated code review agent. "
             "Your task is to contextually evaluate code changes against the provided guidelines.\n\n"
-            "Provide your findings in an easy to understand fashion with analogies if relevant to help developers understand the impact of the change."
+            "Provide your findings in an easy to understand fashion with analogies if relevant to help developers understand the impact of the change.\n\n"
+            "REMEMBER to ALWAYS provide accurate line numbers from the diff\n\n"
             "Guidelines:\n"
         )
 

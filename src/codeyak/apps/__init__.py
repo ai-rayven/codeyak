@@ -1,0 +1,3 @@
+"""
+CodeYak applications.
+"""
