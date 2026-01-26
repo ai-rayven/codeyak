@@ -12,6 +12,7 @@ from pathlib import Path
 
 import click
 
+from ... import __version__
 from ...config import (
     get_settings,
     is_gitlab_configured,
@@ -90,7 +91,7 @@ def ensure_gitlab_configured() -> None:
 
 
 @click.group()
-@click.version_option(version="0.0.1", prog_name="yak")
+@click.version_option(version=__version__, prog_name="yak")
 def main():
     """CodeYak - AI-powered code review tool."""
     pass
