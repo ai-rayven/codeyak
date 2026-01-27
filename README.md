@@ -1,6 +1,14 @@
-# CodeYak
+<div align="center">
+  <img src="images/codeyak-logo.png" alt="CodeYak" width="200">
+  <h1>CodeYak</h1>
+  <p><em>AI-powered code review with configurable guidelines.</em></p>
+  <p>
+    <a href="https://pypi.org/project/codeyak/"><img src="https://img.shields.io/pypi/v/codeyak" alt="PyPI"></a>
+    <a href="https://pypi.org/project/codeyak/"><img src="https://img.shields.io/pypi/pyversions/codeyak" alt="Python"></a>
+  </p>
+</div>
 
-AI-powered code review with configurable guidelines.
+---
 
 ## Installation
 
