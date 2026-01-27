@@ -332,3 +332,51 @@ class ReviewResult(BaseModel):
     The list of all violations found in a batch of files.
     """
     violations: List[GuidelineViolation] = Field(default_factory=list)
+
+
+# --- Guidelines Generation Domain Models ---
+
+class HistoricalCommit(BaseModel):
+    """
+    A commit from git history with metadata and diff summary.
+    """
+    sha: str = Field(..., description="Full commit SHA")
+    message: str = Field(..., description="Commit message")
+    author: str = Field(..., description="Commit author name")
+    date: str = Field(..., description="Commit date as ISO string")
+    files_changed: List[str] = Field(default_factory=list, description="List of file paths changed")
+    diff_summary: str = Field(default="", description="Truncated diff content for LLM analysis")
+
+
+class CommitBatch(BaseModel):
+    """
+    A batch of commits for LLM analysis.
+    """
+    commits: List[HistoricalCommit] = Field(..., description="Commits in this batch")
+    batch_number: int = Field(..., description="Batch index (1-based)")
+    total_batches: int = Field(..., description="Total number of batches")
+
+
+class GeneratedGuideline(BaseModel):
+    """
+    A guideline generated from git history analysis.
+    """
+    label: str = Field(..., description="Short identifier (e.g., 'missing-error-handling')")
+    description: str = Field(..., description="The guideline instruction")
+    reasoning: str = Field(..., description="Why this guideline was generated")
+    confidence: str = Field(default="medium", description="Confidence level: 'low', 'medium', or 'high'")
+    occurrence_count: int = Field(default=1, description="Number of times this pattern was observed")
+
+
+class GuidelineGenerationResult(BaseModel):
+    """
+    Result from analyzing a single batch of commits.
+    """
+    guidelines: List[GeneratedGuideline] = Field(default_factory=list, description="Guidelines identified in this batch")
+
+
+class ConsolidatedGuidelines(BaseModel):
+    """
+    Final deduplicated guidelines after consolidation.
+    """
+    guidelines: List[GeneratedGuideline] = Field(default_factory=list, description="Final consolidated guidelines")

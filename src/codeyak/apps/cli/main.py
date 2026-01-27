@@ -25,6 +25,7 @@ from ...infrastructure import GitLabAdapter, LocalGitAdapter, AzureAdapter
 from ...services import (
     CodeReviewer,
     GuidelinesProvider,
+    GuidelinesGenerator,
     CodeProvider,
     CodeReviewContextBuilder,
     MergeRequestFeedbackPublisher,
@@ -256,6 +257,82 @@ def mr(mr_id: str, project_id: str | None):
         langfuse.flush()
 
     click.echo("Review complete.")
+
+
+@main.command()
+@click.option(
+    "--days",
+    type=int,
+    default=365,
+    help="Number of days of history to analyze (default: 365)"
+)
+def learn(days: int):
+    """Generate guidelines from git history analysis.
+
+    Analyzes commits to identify patterns of mistakes and problematic areas,
+    then generates codeyak guidelines to help avoid future issues.
+
+    Output is written to .codeyak/project.yaml
+    """
+    # Ensure LLM is configured before proceeding
+    ensure_llm_configured()
+
+    repo_path = Path.cwd()
+
+    # Show observability status
+    obs_status = "ON" if is_langfuse_configured() else "OFF"
+    click.echo(f"Observability: {obs_status}")
+
+    # Verify we're in a git repository
+    try:
+        vcs = LocalGitAdapter(repo_path)
+    except ValueError as e:
+        click.echo(f"Error: {e}", err=True)
+        click.echo("The 'learn' command must be run inside a git repository.", err=True)
+        sys.exit(1)
+
+    click.echo(f"Analyzing git history for the last {days} days...")
+
+    # Initialize LLM adapter
+    try:
+        llm = AzureAdapter(
+            api_key=get_settings().AZURE_OPENAI_API_KEY,
+            endpoint=get_settings().AZURE_OPENAI_ENDPOINT,
+            deployment_name=get_settings().AZURE_DEPLOYMENT_NAME,
+            api_version=get_settings().AZURE_OPENAI_API_VERSION
+        )
+    except Exception as e:
+        click.echo(f"Error initializing LLM: {e}", err=True)
+        sys.exit(1)
+
+    # Initialize Langfuse if configured
+    langfuse = None
+    if get_settings().LANGFUSE_SECRET_KEY and get_settings().LANGFUSE_PUBLIC_KEY:
+        from langfuse import Langfuse
+        langfuse = Langfuse(
+            secret_key=get_settings().LANGFUSE_SECRET_KEY,
+            public_key=get_settings().LANGFUSE_PUBLIC_KEY,
+            host=get_settings().LANGFUSE_HOST
+        )
+
+    # Generate guidelines
+    generator = GuidelinesGenerator(vcs=vcs, llm=llm, langfuse=langfuse)
+    yaml_output = generator.generate_from_history(since_days=days)
+
+    # Create .codeyak/ directory if it doesn't exist
+    codeyak_dir = repo_path / ".codeyak"
+    codeyak_dir.mkdir(exist_ok=True)
+
+    # Write output to project.yaml
+    output_path = codeyak_dir / "project.yaml"
+    output_path.write_text(yaml_output)
+
+    click.echo(f"\nGuidelines written to {output_path}")
+    click.echo("Review and customize the generated guidelines before using them.")
+
+    # Flush Langfuse traces
+    if langfuse:
+        langfuse.flush()
 
 
 if __name__ == "__main__":

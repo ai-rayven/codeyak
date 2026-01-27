@@ -2,48 +2,13 @@ from typing import Any, ContextManager, Dict, List, Tuple
 from contextlib import nullcontext
 from codeyak.protocols import LLMClient, FeedbackPublisher
 from codeyak.domain.models import ChangeSummary, Guideline, MergeRequest, ReviewResult, MRComment
+from codeyak.domain.constants import CODE_FILE_EXTENSIONS
 from langfuse import propagate_attributes
 
 from .guidelines import GuidelinesProvider
 from .context import CodeReviewContextBuilder
 from .code import CodeProvider
 from .summary import SummaryGenerator
-
-# Known code file extensions to filter in merge requests
-CODE_FILE_EXTENSIONS = [
-    '.py',      # Python
-    '.js',      # JavaScript
-    '.ts',      # TypeScript
-    '.jsx',     # React JavaScript
-    '.tsx',     # React TypeScript
-    '.java',    # Java
-    '.kt',      # Kotlin
-    '.go',      # Go
-    '.rs',      # Rust
-    '.c',       # C
-    '.cpp',     # C++
-    '.cc',      # C++
-    '.h',       # C/C++ header
-    '.hpp',     # C++ header
-    '.cs',      # C#
-    '.rb',      # Ruby
-    '.php',     # PHP
-    '.swift',   # Swift
-    '.m',       # Objective-C
-    '.scala',   # Scala
-    '.sh',      # Shell script
-    '.bash',    # Bash script
-    '.yaml',    # YAML
-    '.yml',     # YAML
-    '.json',    # JSON
-    '.xml',     # XML
-    '.sql',     # SQL
-    '.html',    # HTML
-    '.css',     # CSS
-    '.scss',    # SCSS
-    '.sass',    # Sass
-    '.vue',     # Vue
-]
 
 
 class CodeReviewer:

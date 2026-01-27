@@ -4,6 +4,7 @@ Local git adapter for reviewing uncommitted changes.
 Implements VCSClient protocol for local git operations using GitPython.
 """
 
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
 
@@ -11,7 +12,7 @@ from git import Repo
 from git.exc import InvalidGitRepositoryError
 
 from ...protocols import VCSClient
-from ...domain.models import FileDiff, GuidelineViolation, MRComment, Commit
+from ...domain.models import FileDiff, GuidelineViolation, MRComment, Commit, HistoricalCommit
 from .diff_parser import UnifiedDiffParser
 
 
@@ -207,3 +208,94 @@ class LocalGitAdapter(VCSClient):
             message: Ignored
         """
         pass
+
+    def get_historical_commits(
+        self,
+        since_days: int = 365,
+        max_commits: int = 1000
+    ) -> List[HistoricalCommit]:
+        """
+        Fetch commits from git history.
+
+        Args:
+            since_days: Number of days of history to analyze
+            max_commits: Maximum number of commits to return
+
+        Returns:
+            List of HistoricalCommit objects
+        """
+        since_date = datetime.now(timezone.utc) - timedelta(days=since_days)
+
+        commits = []
+        for commit in self.repo.iter_commits(max_count=max_commits):
+            # Skip commits older than since_date
+            commit_date = datetime.fromtimestamp(commit.committed_date, tz=timezone.utc)
+            if commit_date < since_date:
+                break
+
+            # Get list of changed files
+            files_changed = []
+            if commit.parents:
+                # Compare with parent to get changed files
+                diff_index = commit.parents[0].diff(commit)
+                for diff_item in diff_index:
+                    file_path = diff_item.b_path or diff_item.a_path
+                    if file_path:
+                        files_changed.append(file_path)
+            else:
+                # Initial commit - list all files
+                for item in commit.tree.traverse():
+                    if item.type == 'blob':
+                        files_changed.append(item.path)
+
+            commits.append(HistoricalCommit(
+                sha=commit.hexsha,
+                message=commit.message.strip(),
+                author=commit.author.name or "unknown",
+                date=commit_date.isoformat(),
+                files_changed=files_changed,
+                diff_summary=""  # Will be populated separately if needed
+            ))
+
+        return commits
+
+    def get_commit_diff(self, commit_sha: str, max_lines: int = 100) -> str:
+        """
+        Get truncated diff for a specific commit.
+
+        Args:
+            commit_sha: The commit SHA to get diff for
+            max_lines: Maximum number of lines to return
+
+        Returns:
+            Truncated diff as string
+        """
+        try:
+            commit = self.repo.commit(commit_sha)
+
+            if not commit.parents:
+                # Initial commit - show all files as additions
+                diff_text = commit.diff(None, create_patch=True)
+            else:
+                # Compare with parent
+                diff_text = commit.parents[0].diff(commit, create_patch=True)
+
+            # Build diff string
+            lines = []
+            for diff_item in diff_text:
+                if diff_item.diff:
+                    decoded = diff_item.diff.decode("utf-8", errors="replace")
+                    lines.extend(decoded.split("\n"))
+
+                if len(lines) >= max_lines:
+                    break
+
+            # Truncate and add indicator
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                lines.append("\n... (truncated)")
+
+            return "\n".join(lines)
+
+        except Exception:
+            return ""

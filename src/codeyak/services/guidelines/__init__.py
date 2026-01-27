@@ -8,6 +8,7 @@ guideline sets from both built-in and project-specific sources.
 Public API:
     GuidelinesProvider: Main class for managing guideline sets
     GuidelinesParser: Parser for YAML guideline files (typically used internally)
+    GuidelinesGenerator: Generator for creating guidelines from git history
 
     Exceptions:
         GuidelinesLoadError: Base exception for guideline loading errors
@@ -17,10 +18,12 @@ Public API:
 
 from .provider import GuidelinesProvider
 from .parser import GuidelinesParser
+from .generator import GuidelinesGenerator
 
 __all__ = [
     'GuidelinesProvider',
     'GuidelinesParser',
+    'GuidelinesGenerator',
     'GuidelinesLoadError',
     'BuiltinGuidelineNotFoundError',
     'GuidelineIncludeError',
