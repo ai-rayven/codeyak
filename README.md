@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="images/codeyak-logo.png" alt="CodeYak" width="200">
+  <img src="https://raw.githubusercontent.com/ai-rayven/codeyak/main/images/codeyak-logo.png" alt="CodeYak" width="200">
   <h1>CodeYak</h1>
   <p><em>AI-powered code review with configurable guidelines.</em></p>
   <p>
