@@ -11,20 +11,22 @@ from pathlib import Path
 
 import click
 import tomli_w
+from rich.panel import Panel
 
 from ...config import get_config_path, reset_settings
+from ...ui import console, BRAND_BORDER
 
 
 def _show_key_feedback(key: str, label: str) -> None:
     """Show feedback about entered key without revealing it."""
     if not key:
-        click.echo(f"  ⚠ Warning: No {label} was entered")
+        console.print(f"  [warning]Warning: No {label} was entered[/warning]")
     elif len(key) < 10:
-        click.echo(f"  ✓ {label} entered ({len(key)} characters)")
+        console.print(f"  [success]{label} entered[/success] [muted]({len(key)} characters)[/muted]")
     else:
         # Show first 4 and last 4 chars for verification
         masked = f"{key[:4]}...{key[-4:]}"
-        click.echo(f"  ✓ {label} entered: {masked} ({len(key)} characters)")
+        console.print(f"  [success]{label} entered:[/success] {masked} [muted]({len(key)} characters)[/muted]")
 
 
 def _load_existing_config() -> dict:
@@ -53,24 +55,28 @@ def _save_config(config: dict) -> None:
 
 def run_llm_init() -> None:
     """Run interactive init flow for LLM (Azure OpenAI) configuration only."""
-    click.echo()
-    click.echo("=== LLM Provider ===")
-    click.echo("Available providers:")
-    click.echo("  1. Azure OpenAI")
-    click.echo()
+    console.print()
+    console.print(Panel(
+        "[brand]LLM Provider[/brand]",
+        border_style=BRAND_BORDER,
+        padding=(0, 2)
+    ))
+    console.print("Available providers:")
+    console.print("  1. Azure OpenAI")
+    console.print()
 
     # Azure OpenAI Endpoint
-    click.echo("  Example: https://your-resource.openai.azure.com/")
+    console.print("  [muted]Example: https://your-resource.openai.azure.com/[/muted]")
     endpoint = click.prompt("  Azure OpenAI Endpoint", type=str)
 
     # API Key
-    click.echo()
-    click.echo("  Found in Azure Portal > Your OpenAI Resource > Keys and Endpoint")
+    console.print()
+    console.print("  [muted]Found in Azure Portal > Your OpenAI Resource > Keys and Endpoint[/muted]")
     api_key = click.prompt("  Azure OpenAI API Key", type=str, hide_input=True)
     _show_key_feedback(api_key, "API Key")
 
     # Deployment Name
-    click.echo()
+    console.print()
     deployment_name = click.prompt(
         "  Deployment Name", type=str, default="gpt-4o", show_default=True
     )
@@ -91,14 +97,18 @@ def run_llm_init() -> None:
     reset_settings()
 
     config_path = get_config_path()
-    click.echo()
-    click.echo(f"Configuration saved to {config_path}")
+    console.print()
+    console.print(f"[success]Configuration saved to {config_path}[/success]")
 
 
 def run_gitlab_init() -> None:
     """Run interactive init flow for GitLab configuration only."""
-    click.echo()
-    click.echo("=== GitLab Configuration ===")
+    console.print()
+    console.print(Panel(
+        "[brand]GitLab Configuration[/brand]",
+        border_style=BRAND_BORDER,
+        padding=(0, 2)
+    ))
 
     # GitLab URL
     gitlab_url = click.prompt(
@@ -106,8 +116,8 @@ def run_gitlab_init() -> None:
     )
 
     # GitLab Token
-    click.echo()
-    click.echo("  Personal Access Token (create at GitLab > Settings > Access Tokens)")
+    console.print()
+    console.print("  [muted]Personal Access Token (create at GitLab > Settings > Access Tokens)[/muted]")
     gitlab_token = click.prompt("  GitLab Token", type=str, hide_input=True)
     _show_key_feedback(gitlab_token, "Token")
 
@@ -119,16 +129,20 @@ def run_gitlab_init() -> None:
     _save_config(config)
     reset_settings()
 
-    click.echo()
-    click.echo(f"Configuration saved to {get_config_path()}")
+    console.print()
+    console.print(f"[success]Configuration saved to {get_config_path()}[/success]")
 
 
 def run_langfuse_init() -> None:
     """Run interactive init flow for Langfuse configuration only."""
-    click.echo()
-    click.echo("=== Langfuse Configuration (Optional) ===")
-    click.echo("  Langfuse provides observability for your LLM calls.")
-    click.echo()
+    console.print()
+    console.print(Panel(
+        "[brand]Langfuse Configuration (Optional)[/brand]",
+        border_style=BRAND_BORDER,
+        padding=(0, 2)
+    ))
+    console.print("  [muted]Langfuse provides observability for your LLM calls.[/muted]")
+    console.print()
 
     # Secret Key
     secret_key = click.prompt("  Langfuse Secret Key", type=str, hide_input=True)
@@ -154,8 +168,8 @@ def run_langfuse_init() -> None:
     _save_config(config)
     reset_settings()
 
-    click.echo()
-    click.echo(f"Configuration saved to {get_config_path()}")
+    console.print()
+    console.print(f"[success]Configuration saved to {get_config_path()}[/success]")
 
 
 def run_full_init(include_gitlab: bool = False) -> None:
@@ -165,8 +179,8 @@ def run_full_init(include_gitlab: bool = False) -> None:
     Args:
         include_gitlab: If True, also prompt for GitLab configuration.
     """
-    click.echo()
-    click.echo("Looks like you haven't configured CodeYak yet. Let's get you set up!")
+    console.print()
+    console.print("[info]Looks like you haven't configured CodeYak yet. Let's get you set up![/info]")
 
     # Always configure LLM
     run_llm_init()
@@ -176,10 +190,10 @@ def run_full_init(include_gitlab: bool = False) -> None:
         run_gitlab_init()
 
     # Ask about Langfuse
-    click.echo()
+    console.print()
     if click.confirm("Would you like to configure Langfuse for observability?", default=False):
         run_langfuse_init()
 
-    click.echo()
-    click.echo("Continuing with your command...")
-    click.echo()
+    console.print()
+    console.print("[info]Continuing with your command...[/info]")
+    console.print()

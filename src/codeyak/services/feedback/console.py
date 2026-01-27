@@ -5,8 +5,12 @@ Console feedback publisher for outputting review results to the terminal.
 from collections import defaultdict
 from typing import Dict, List
 
+from rich.panel import Panel
+from rich.table import Table
+
 from ...domain.models import ReviewResult, GuidelineViolation
 from ...protocols import FeedbackPublisher
+from ...ui import console, BRAND_BORDER
 
 
 class ConsoleFeedbackPublisher(FeedbackPublisher):
@@ -60,36 +64,54 @@ class ConsoleFeedbackPublisher(FeedbackPublisher):
             total_original_violations: Total number of violations before filtering duplicates
             total_filtered_violations: Total number of violations after filtering duplicates
         """
-        print("\n" + "=" * 60)
-        print("=== CodeYak Review ===")
-        print("=" * 60 + "\n")
+        console.print()
+        console.print(Panel(
+            "[brand]CodeYak Review[/brand]",
+            border_style=BRAND_BORDER,
+            padding=(0, 2)
+        ))
+        console.print()
 
         if not self._violations_by_file:
-            print("No high-confidence violations found. Code looks good.")
+            console.print("[success]No high-confidence violations found. Code looks good.[/success]")
         else:
             # Print violations grouped by file
             for file_path in sorted(self._violations_by_file.keys()):
                 violations = self._violations_by_file[file_path]
-                print(f"{file_path}")
+                console.print(f"[filepath]{file_path}[/filepath]")
 
                 # Sort violations by line number
                 for violation in sorted(violations, key=lambda v: v.line_number):
-                    print(f"  Line {violation.line_number}: [{violation.guideline_id}] ({violation.confidence})")
-                    print(f"    {violation.reasoning}")
-                print()
+                    console.print(
+                        f"  [line_number]Line {violation.line_number}[/line_number]: "
+                        f"[guideline][{violation.guideline_id}][/guideline] "
+                        f"[muted]({violation.confidence})[/muted]"
+                    )
+                    console.print(f"    {violation.reasoning}")
+                console.print()
 
-        # Print summary
-        print("=" * 60)
-        print("=== Summary ===")
-        print("=" * 60)
-        print(f"Files with violations: {len(self._violations_by_file)}")
+        # Summary table
+        summary_table = Table(show_header=False, box=None, padding=(0, 1))
+        summary_table.add_column("Label", style="muted")
+        summary_table.add_column("Value")
 
-        # Count by confidence
+        summary_table.add_row(
+            "Files with violations",
+            str(len(self._violations_by_file))
+        )
+
         high_count = self._total_posted
         if high_count > 0:
-            print(f"Violations: {high_count} high")
+            summary_table.add_row("Violations", f"[warning]{high_count} high[/warning]")
         else:
-            print("Violations: 0")
+            summary_table.add_row("Violations", "[success]0[/success]")
+
+        console.print(Panel(
+            summary_table,
+            title="[brand]Summary[/brand]",
+            border_style=BRAND_BORDER,
+            padding=(0, 1)
+        ))
 
     def post_general_comment(self, message: str) -> None:
         """No-op for console output - general comments are not printed."""

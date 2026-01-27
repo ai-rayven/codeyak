@@ -32,6 +32,7 @@ from ...services import (
     ConsoleFeedbackPublisher,
     SummaryGenerator,
 )
+from ...ui import console, RichProgressReporter, CIProgressReporter
 
 
 def ensure_llm_configured() -> None:
@@ -53,12 +54,12 @@ def ensure_llm_configured() -> None:
         run_full_init(include_gitlab=False)
     else:
         # Config file exists but LLM not configured
-        click.echo()
-        click.echo("LLM provider is not configured. Let's set it up!")
+        console.print()
+        console.print("[info]LLM provider is not configured. Let's set it up![/info]")
         run_llm_init()
-        click.echo()
-        click.echo("Continuing with your command...")
-        click.echo()
+        console.print()
+        console.print("[info]Continuing with your command...[/info]")
+        console.print()
 
 
 def ensure_gitlab_configured() -> None:
@@ -83,12 +84,12 @@ def ensure_gitlab_configured() -> None:
         run_full_init(include_gitlab=True)
     else:
         # Config file exists but GitLab not configured
-        click.echo()
-        click.echo("GitLab integration is not configured. Let's set it up!")
+        console.print()
+        console.print("[info]GitLab integration is not configured. Let's set it up![/info]")
         run_gitlab_init()
-        click.echo()
-        click.echo("Continuing with your command...")
-        click.echo()
+        console.print()
+        console.print("[info]Continuing with your command...[/info]")
+        console.print()
 
 
 @click.group()
@@ -107,6 +108,10 @@ def main():
 )
 def review(path: Path | None):
     """Review local uncommitted changes."""
+    # Show banner first
+    progress = RichProgressReporter()
+    progress.banner("Codeyak", __version__)
+
     # Ensure LLM is configured before proceeding
     ensure_llm_configured()
 
@@ -114,8 +119,8 @@ def review(path: Path | None):
 
     # Show observability status
     obs_status = "ON" if is_langfuse_configured() else "OFF"
-    click.echo(f"Observability: {obs_status}")
-    click.echo(f"Reviewing uncommitted changes in {repo_path}...")
+    progress.info(f"Observability: {obs_status}")
+    progress.info(f"Reviewing uncommitted changes in {repo_path}...")
 
     try:
         # Initialize adapters
@@ -161,7 +166,8 @@ def review(path: Path | None):
         llm=llm,
         feedback=feedback,
         summary=summary,
-        langfuse=langfuse
+        langfuse=langfuse,
+        progress=progress,
     )
 
     bot.review_local_changes()
@@ -195,9 +201,9 @@ def mr(mr_id: str, project_id: str | None):
         sys.exit(1)
 
     # Show observability status
-    obs_status = "ON" if is_langfuse_configured() else "OFF"
-    click.echo(f"Observability: {obs_status}")
-    click.echo(f"Reviewing MR {mr_id} in project {project_id}...")
+    obs_status = "[success]ON[/success]" if is_langfuse_configured() else "[muted]OFF[/muted]"
+    console.print(f"Observability: {obs_status}")
+    console.print(f"[info]Reviewing MR {mr_id} in project {project_id}...[/info]")
 
     # Initialize adapters
     try:
@@ -238,6 +244,7 @@ def mr(mr_id: str, project_id: str | None):
     code = CodeProvider(vcs)
     feedback = MergeRequestFeedbackPublisher(vcs, mr_id)
     summary = SummaryGenerator(llm, langfuse)
+    progress = CIProgressReporter()
 
     # Create reviewer and run
     bot = CodeReviewer(
@@ -248,6 +255,7 @@ def mr(mr_id: str, project_id: str | None):
         llm=llm,
         summary=summary,
         langfuse=langfuse,
+        progress=progress,
     )
 
     bot.review_merge_request(mr_id)
@@ -256,7 +264,7 @@ def mr(mr_id: str, project_id: str | None):
     if langfuse:
         langfuse.flush()
 
-    click.echo("Review complete.")
+    progress.success("Review complete.")
 
 
 @main.command()
@@ -274,6 +282,10 @@ def learn(days: int):
 
     Output is written to .codeyak/project.yaml
     """
+    # Show banner first
+    progress = RichProgressReporter()
+    progress.banner("Codeyak", __version__)
+
     # Ensure LLM is configured before proceeding
     ensure_llm_configured()
 
@@ -281,7 +293,7 @@ def learn(days: int):
 
     # Show observability status
     obs_status = "ON" if is_langfuse_configured() else "OFF"
-    click.echo(f"Observability: {obs_status}")
+    progress.info(f"Observability: {obs_status}")
 
     # Verify we're in a git repository
     try:
@@ -291,7 +303,7 @@ def learn(days: int):
         click.echo("The 'learn' command must be run inside a git repository.", err=True)
         sys.exit(1)
 
-    click.echo(f"Analyzing git history for the last {days} days...")
+    progress.info(f"Analyzing git history for the last {days} days...")
 
     # Initialize LLM adapter
     try:
@@ -316,7 +328,7 @@ def learn(days: int):
         )
 
     # Generate guidelines
-    generator = GuidelinesGenerator(vcs=vcs, llm=llm, langfuse=langfuse)
+    generator = GuidelinesGenerator(vcs=vcs, llm=llm, langfuse=langfuse, progress=progress)
     yaml_output = generator.generate_from_history(since_days=days)
 
     # Create .codeyak/ directory if it doesn't exist
@@ -327,8 +339,8 @@ def learn(days: int):
     output_path = codeyak_dir / "project.yaml"
     output_path.write_text(yaml_output)
 
-    click.echo(f"\nGuidelines written to {output_path}")
-    click.echo("Review and customize the generated guidelines before using them.")
+    progress.success(f"Guidelines written to {output_path}")
+    progress.info("Review and customize the generated guidelines before using them.")
 
     # Flush Langfuse traces
     if langfuse:

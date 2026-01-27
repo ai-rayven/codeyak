@@ -94,6 +94,50 @@ class LLMClient(Protocol):
         ...
 
 
+class ProgressReporter(Protocol):
+    """Protocol for reporting progress during long-running operations."""
+
+    def banner(self, name: str, version: str) -> None:
+        """Display an application banner with name and version."""
+        ...
+
+    def info(self, message: str) -> None:
+        """Display an informational message."""
+        ...
+
+    def warning(self, message: str) -> None:
+        """Display a warning message."""
+        ...
+
+    def success(self, message: str) -> None:
+        """Display a success message."""
+        ...
+
+    def start_progress(self, description: str, total: int) -> Any:
+        """Start a progress bar and return a task handle."""
+        ...
+
+    def update_progress(self, task: Any, description: str) -> None:
+        """Update the description of a progress task."""
+        ...
+
+    def advance_progress(self, task: Any) -> None:
+        """Advance the progress bar by one step."""
+        ...
+
+    def stop_progress(self) -> None:
+        """Stop and clean up the progress bar."""
+        ...
+
+    def start_status(self, message: str) -> Any:
+        """Start a status spinner and return a context handle."""
+        ...
+
+    def stop_status(self) -> None:
+        """Stop the status spinner."""
+        ...
+
+
 class FeedbackPublisher(Protocol):
     """Protocol for publishing review feedback."""
 

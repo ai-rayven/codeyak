@@ -249,6 +249,7 @@ dependencies = [
     { name = "pydantic-settings" },
     { name = "python-gitlab" },
     { name = "pyyaml" },
+    { name = "rich" },
     { name = "tomli-w" },
 ]
 
@@ -272,6 +273,7 @@ requires-dist = [
     { name = "pytest-mock", marker = "extra == 'test'", specifier = ">=3.14.0" },
     { name = "python-gitlab", specifier = ">=7.1.0" },
     { name = "pyyaml", specifier = ">=6.0.1" },
+    { name = "rich", specifier = ">=14.0.0" },
     { name = "tomli-w", specifier = ">=1.0.0" },
 ]
 provides-extras = ["test"]

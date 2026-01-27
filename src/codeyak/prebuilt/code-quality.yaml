@@ -27,6 +27,6 @@ guidelines:
   - label: remove-dead-code
     description: Remove dead code, commented-out code, and unused imports. Keep the codebase clean.
 
-  # Error Handling
-  - label: handle-exceptions
-    description: Do not catch exceptions unless you are handling them. Let them bubble up. It is ok to swallow general exceptions and log in fire and forget use cases. It is also ok to catch, add context and rethrow exception.
+  # Unecessary Complexity
+  - label: overengineering
+    description: Avoid adding complexity when something more simple would suffice. If complexity is added, there must be a comment indicating why.

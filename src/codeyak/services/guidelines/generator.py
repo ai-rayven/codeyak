@@ -10,7 +10,7 @@ from typing import List
 
 from langfuse import propagate_attributes
 
-from codeyak.protocols import LLMClient
+from codeyak.protocols import LLMClient, ProgressReporter
 from codeyak.infrastructure.vcs.local_git import LocalGitAdapter
 from codeyak.domain.models import (
     HistoricalCommit,
@@ -20,6 +20,7 @@ from codeyak.domain.models import (
     ConsolidatedGuidelines,
 )
 from codeyak.domain.constants import CODE_FILE_EXTENSIONS
+from codeyak.ui import NullProgressReporter
 
 
 class GuidelinesGenerator:
@@ -35,7 +36,13 @@ class GuidelinesGenerator:
     MAX_GUIDELINES_PER_BATCH = 10
     MAX_FINAL_GUIDELINES = 20
 
-    def __init__(self, vcs: LocalGitAdapter, llm: LLMClient, langfuse=None):
+    def __init__(
+        self,
+        vcs: LocalGitAdapter,
+        llm: LLMClient,
+        langfuse=None,
+        progress: ProgressReporter | None = None
+    ):
         """
         Initialize the guidelines generator.
 
@@ -43,10 +50,12 @@ class GuidelinesGenerator:
             vcs: Local git adapter for accessing commit history
             llm: LLM client for analysis
             langfuse: Optional Langfuse client for tracing
+            progress: Optional progress reporter for UI feedback
         """
         self.vcs = vcs
         self.llm = llm
         self.langfuse = langfuse
+        self.progress = progress or NullProgressReporter()
 
     def generate_from_history(self, since_days: int = 365) -> str:
         """
@@ -93,11 +102,11 @@ class GuidelinesGenerator:
     ) -> str:
         """Internal method that runs within the trace context."""
         # 1. Fetch commits
-        print(f"Fetching commits from the last {since_days} days...")
+        self.progress.info(f"Fetching commits from the last {since_days} days...")
         commits = self.vcs.get_historical_commits(since_days=since_days)
 
         if not commits:
-            print("No commits found in the specified time range.")
+            self.progress.warning("No commits found in the specified time range.")
             if trace:
                 trace.update_trace(output={"guideline_count": 0}, tags=[project_name, "no_commits"])
                 trace.end()
@@ -105,42 +114,56 @@ class GuidelinesGenerator:
 
         # 2. Filter to code files only
         commits = self._filter_code_commits(commits)
-        print(f"Found {len(commits)} commits with code changes.")
+        self.progress.info(f"Found {len(commits)} commits with code changes.")
 
         if not commits:
-            print("No code-related commits found.")
+            self.progress.warning("No code-related commits found.")
             if trace:
                 trace.update_trace(output={"guideline_count": 0}, tags=[project_name, "no_commits"])
                 trace.end()
             return self._format_empty_yaml()
 
-        # 3. Add diff summaries
-        print("Fetching diff summaries...")
+        # 3. Add diff summaries with progress
+        self.progress.info("Fetching diff summaries...")
         commits = self._enrich_with_diffs(commits)
 
         # 4. Batch commits
         batches = self._batch_commits(commits)
-        print(f"Created {len(batches)} batches for analysis.")
+        self.progress.info(f"Created {len(batches)} batches for analysis.")
 
-        # 5. Analyze each batch
+        # 5. Analyze each batch with progress bar
         all_guidelines: List[GeneratedGuideline] = []
-        for batch in batches:
-            print(f"Analyzing batch {batch.batch_number}/{batch.total_batches}...")
-            result = self._analyze_batch(batch, trace=trace)
-            all_guidelines.extend(result.guidelines)
-            print(f"  Found {len(result.guidelines)} potential guidelines.")
+
+        task = self.progress.start_progress("Analyzing batches...", total=len(batches))
+        try:
+            for batch in batches:
+                self.progress.update_progress(
+                    task,
+                    f"Analyzing batch {batch.batch_number}/{batch.total_batches}"
+                )
+                result = self._analyze_batch(batch, trace=trace)
+                all_guidelines.extend(result.guidelines)
+                self.progress.advance_progress(task)
+        finally:
+            self.progress.stop_progress()
+
+        self.progress.info(f"Found {len(all_guidelines)} potential guidelines.")
 
         if not all_guidelines:
-            print("No patterns identified in commit history.")
+            self.progress.warning("No patterns identified in commit history.")
             if trace:
                 trace.update_trace(output={"guideline_count": 0}, tags=[project_name, "no_guidelines"])
                 trace.end()
             return self._format_empty_yaml()
 
         # 6. Consolidate guidelines
-        print(f"Consolidating {len(all_guidelines)} guidelines...")
-        consolidated = self._consolidate_guidelines(all_guidelines, trace=trace)
-        print(f"Final guidelines: {len(consolidated.guidelines)}")
+        self.progress.info(f"Consolidating {len(all_guidelines)} guidelines...")
+        self.progress.start_status("Consolidating guidelines...")
+        try:
+            consolidated = self._consolidate_guidelines(all_guidelines, trace=trace)
+        finally:
+            self.progress.stop_status()
+        self.progress.success(f"Final guidelines: {len(consolidated.guidelines)}")
 
         # End trace with output
         if trace:

@@ -67,7 +67,6 @@ class GuidelinesProvider:
             guideline_sets = self._load_builtin_default()
 
         self._validate_guideline_sets(guideline_sets)
-        self._print_loading_summary(guideline_sets)
 
         return guideline_sets
 
@@ -109,8 +108,6 @@ class GuidelinesProvider:
         if not yaml_files_content:
             return []
 
-        print(f"📦 Found {len(yaml_files_content)} .codeyak file(s) in repository")
-
         # Create temporary directory for storing fetched files
         temp_dir = Path(tempfile.mkdtemp(prefix="codeyak_"))
         temp_files = []
@@ -119,7 +116,6 @@ class GuidelinesProvider:
             temp_file = temp_dir / filename
             temp_file.write_text(content)
             temp_files.append(temp_file)
-            print(f"  📄 {filename}")
 
         return temp_files
 
@@ -150,8 +146,6 @@ class GuidelinesProvider:
             GuidelineIncludeError: If circular includes detected
         """
         guideline_sets = {}
-
-        print(f"Loading {yaml_file.name}...")
 
         # Parse file with metadata (extracts includes without merging)
         file_info = self.parser.parse_file_with_metadata(
@@ -185,7 +179,6 @@ class GuidelinesProvider:
 
             # Store as separate set
             guideline_sets[display_name] = included_guidelines
-            print(f"  ✅ Loaded {len(included_guidelines)} guidelines from {display_name}")
 
         # Add local guidelines as separate set (if any)
         if file_info.has_local_guidelines:
@@ -200,7 +193,6 @@ class GuidelinesProvider:
 
             # Store as separate set
             guideline_sets[display_name] = file_info.local_guidelines
-            print(f"  ✅ Loaded {len(file_info.local_guidelines)} guidelines from {display_name}")
 
         return guideline_sets
 
@@ -222,7 +214,6 @@ class GuidelinesProvider:
             GuidelinesLoadError: If files are invalid or have duplicate IDs
         """
         codeyak_dir = Path.cwd() / ".codeyak"
-        print(f"Loading project-specific guidelines from {codeyak_dir}...")
 
         guideline_sets = {}
         all_seen_ids = set()
@@ -271,8 +262,6 @@ class GuidelinesProvider:
         Raises:
             GuidelinesLoadError: If default guideline set not found
         """
-        print("ℹ️  No project-specific guidelines found in .codeyak/")
-        print("Loading built-in 'default' guideline set...")
 
         try:
             builtin_path = self.parser._get_builtin_guidelines_path()
@@ -357,17 +346,6 @@ class GuidelinesProvider:
                 "No guidelines loaded. This should not happen - please report this bug."
             )
 
-    def _print_loading_summary(self, guideline_sets: Dict[str, List[Guideline]]) -> None:
-        """
-        Print a summary of loaded guidelines.
-
-        Args:
-            guideline_sets: The loaded guideline sets
-        """
-        total_guidelines = sum(len(guidelines) for guidelines in guideline_sets.values())
-        total_sets = len(guideline_sets)
-        print(f"✅ Total: {total_guidelines} guidelines across {total_sets} guideline set(s)")
-
     def load_guidelines_local(self) -> Dict[str, List[Guideline]]:
         """
         Load guideline sets from local filesystem only (no VCS fetch).
@@ -394,6 +372,5 @@ class GuidelinesProvider:
             guideline_sets = self._load_builtin_default()
 
         self._validate_guideline_sets(guideline_sets)
-        self._print_loading_summary(guideline_sets)
 
         return guideline_sets

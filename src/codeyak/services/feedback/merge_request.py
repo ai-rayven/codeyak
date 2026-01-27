@@ -5,6 +5,7 @@ Feedback publishing service for posting review results to VCS.
 from ...domain.models import ReviewResult
 from ...domain.exceptions import LineNotInDiffError, VCSCommentError
 from ...protocols import VCSClient, FeedbackPublisher
+from ...ui import console
 
 
 class MergeRequestFeedbackPublisher(FeedbackPublisher):
@@ -41,19 +42,19 @@ class MergeRequestFeedbackPublisher(FeedbackPublisher):
         for violation in review_result.violations:
             # Filter low-confidence violations
             if violation.confidence == "low" or violation.confidence == "medium":
-                print(f"     ⚠️  Skipping {violation.confidence}-confidence: {violation.guideline_id} in {violation.file_path}")
+                console.print(f"     [warning]Skipping {violation.confidence}-confidence:[/warning] [guideline]{violation.guideline_id}[/guideline] in [filepath]{violation.file_path}[/filepath]")
                 continue
 
-            print(f"     found {violation.guideline_id} in {violation.file_path} (confidence: {violation.confidence})")
+            console.print(f"     [info]Found[/info] [guideline]{violation.guideline_id}[/guideline] in [filepath]{violation.file_path}[/filepath] [muted](confidence: {violation.confidence})[/muted]")
             try:
                 self.vcs_client.post_comment(self.merge_request_id, violation)
                 posted_count += 1
             except LineNotInDiffError:
                 # Line not in diff - skip this comment (only post inline comments)
-                print(f"⚠️  Skipping comment (line not in diff): {violation.file_path}:{violation.line_number}")
+                console.print(f"[warning]Skipping comment (line not in diff):[/warning] [filepath]{violation.file_path}:{violation.line_number}[/filepath]")
             except VCSCommentError as e:
                 # Other VCS error - report it but continue
-                print(f"❌ Failed to post comment: {e}")
+                console.print(f"[error]Failed to post comment:[/error] {e}")
         return posted_count
 
     def post_review_summary(
@@ -82,7 +83,7 @@ class MergeRequestFeedbackPublisher(FeedbackPublisher):
         try:
             self.vcs_client.post_general_comment(self.merge_request_id, message)
         except VCSCommentError as e:
-            print(f"⚠️  Could not post success comment: {e}")
+            console.print(f"[warning]Could not post success comment:[/warning] {e}")
 
     def post_general_comment(self, message: str) -> None:
         """Post a general comment on the merge request."""

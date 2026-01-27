@@ -1,8 +1,11 @@
 from typing import Any, ContextManager, Dict, List, Tuple
 from contextlib import nullcontext
-from codeyak.protocols import LLMClient, FeedbackPublisher
+from rich.rule import Rule
+
+from codeyak.protocols import LLMClient, FeedbackPublisher, ProgressReporter
 from codeyak.domain.models import ChangeSummary, Guideline, MergeRequest, ReviewResult, MRComment
 from codeyak.domain.constants import CODE_FILE_EXTENSIONS
+from codeyak.ui import console, BRAND_BORDER, NullProgressReporter
 from langfuse import propagate_attributes
 
 from .guidelines import GuidelinesProvider
@@ -21,6 +24,7 @@ class CodeReviewer:
         feedback: FeedbackPublisher,
         summary: SummaryGenerator,
         langfuse=None,
+        progress: ProgressReporter | None = None,
     ):
         self.context = context
         self.code = code
@@ -29,6 +33,7 @@ class CodeReviewer:
         self.feedback = feedback
         self.summary = summary
         self.langfuse = langfuse
+        self.progress = progress or NullProgressReporter()
 
     def _start_trace(self, merge_request: MergeRequest) -> Tuple[Any, ContextManager]:
         """Start Langfuse trace and return (trace, propagate_context)."""
@@ -60,7 +65,7 @@ class CodeReviewer:
         return trace, context
 
     def review_merge_request(self, merge_request_id: str):
-        print(f"Starting review for MR {merge_request_id}...")
+        self.progress.info(f"Starting review for MR {merge_request_id}...")
 
         # Load data first
         guideline_sets = self.guidelines.load_guidelines_from_vcs(
@@ -83,7 +88,7 @@ class CodeReviewer:
                 generate_summary=True,
             )
 
-        print("✅ Review complete.")
+        self.progress.success("Review complete.")
 
     def _get_review_result_traced(
         self,
@@ -119,8 +124,12 @@ class CodeReviewer:
                 input=messages,  # Full ChatML format
             )
 
-        # Call LLM
-        output = self.llm.generate(messages, response_model=ReviewResult)
+        # Call LLM with spinner
+        self.progress.start_status("Analyzing code...")
+        try:
+            output = self.llm.generate(messages, response_model=ReviewResult)
+        finally:
+            self.progress.stop_status()
 
         # End generation with output
         if generation:
@@ -164,13 +173,13 @@ class CodeReviewer:
             )
 
             if is_duplicate:
-                print(f"     ⏭️  Skipping duplicate: {violation.guideline_id} at {violation.file_path}:{violation.line_number}")
+                self.progress.info(f"     Skipping duplicate: {violation.guideline_id} at {violation.file_path}:{violation.line_number}")
                 filtered_count += 1
             else:
                 filtered_violations.append(violation)
 
         if filtered_count > 0:
-            print(f"     Filtered {filtered_count} duplicate violations")
+            self.progress.info(f"     Filtered {filtered_count} duplicate violations")
 
         return ReviewResult(violations=filtered_violations), original_count
 
@@ -182,18 +191,21 @@ class CodeReviewer:
             merge_request: MergeRequest object with diffs, commits, and id
             trace: Langfuse trace object (None if tracing disabled)
         """
-        print(f"\n{'='*80}")
-        print("📋 Generating MR summary...")
-        print(f"{'='*80}")
+        console.print()
+        console.print(Rule("[brand]Generating MR Summary[/brand]", style=BRAND_BORDER))
 
         # Generate summary using LLM (with tracing)
-        summary = self.summary.generate_summary(merge_request, trace)
+        self.progress.start_status("Generating summary...")
+        try:
+            summary = self.summary.generate_summary(merge_request, trace)
+        finally:
+            self.progress.stop_status()
 
         # Format and post as general comment
-        print(f"Summary: {summary.summary}")
+        self.progress.info(f"Summary: {summary.summary}")
 
         self.feedback.post_general_comment(summary.summary)
-        print("✅ Summary posted")
+        self.progress.success("Summary posted")
 
         return summary
 
@@ -225,12 +237,13 @@ class CodeReviewer:
         total_filtered_violations = 0
 
         for filename, guidelines in guideline_sets.items():
-            print(f"\n{'='*80}")
-            print(f"🔍 Running focused review with {filename} ({len(guidelines)} guidelines)")
-            print(f"{'='*80}")
+            console.print()
+            console.print(Rule(
+                f"[brand]Reviewing with {filename}[/brand] [muted]({len(guidelines)} guidelines)[/muted]",
+                style=BRAND_BORDER
+            ))
 
             result = self._get_review_result_traced(merge_request, summary, filename, guidelines, trace)
-            print(result.model_dump_json())
 
             # Filter duplicates and track both counts
             filtered_result, original_count = self._filter_existing_violations(
@@ -257,7 +270,8 @@ class CodeReviewer:
             trace.end()
 
         # Post review summary
-        print(f"\n{'='*80}")
+        console.print()
+        console.print(Rule(style=BRAND_BORDER))
         self.feedback.post_review_summary(
             total_original_violations,
             total_filtered_violations
@@ -270,7 +284,7 @@ class CodeReviewer:
         Uses CodeProvider to get filtered diffs as a MergeRequest,
         loads guidelines locally, and runs the review without summary generation.
         """
-        print("Starting review of local changes...")
+        self.progress.info("Starting review of local changes...")
 
         # Get merge request with filtered diffs
         merge_request = self.code.get_merge_request(
@@ -280,10 +294,10 @@ class CodeReviewer:
 
         # Check for empty diff
         if not merge_request.file_diffs:
-            print("No code file changes found.")
+            self.progress.warning("No code file changes found.")
             return
 
-        print(f"Found changes in {len(merge_request.file_diffs)} code file(s).")
+        self.progress.info(f"Found changes in {len(merge_request.file_diffs)} code file(s).")
 
         # Load guidelines locally
         guideline_sets = self.guidelines.load_guidelines_local()
@@ -300,4 +314,4 @@ class CodeReviewer:
                 is_local=True
             )
 
-        print("✅ Review complete.")
+        self.progress.success("Review complete.")
