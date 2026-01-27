@@ -135,6 +135,7 @@ class FileDiff(BaseModel):
     )
     full_content: Optional[str] = None  # Full file content for context
     raw_diff: Optional[str] = None  # Raw diff for debugging/other uses
+    is_new_file: bool = False  # True for untracked files not yet added to git
 
     def format_with_line_numbers(self) -> str:
         """Format the diff with line numbers for easy reference by reviewers."""
@@ -168,6 +169,22 @@ class FileDiff(BaseModel):
                     lines.append(f"{blank} | -{diff_line.content}")
 
         return "\n".join(lines)
+
+    def format_content_with_line_numbers(self) -> str:
+        """Format full file content with line numbers for new files."""
+        if not self.full_content:
+            return ""
+
+        lines = self.full_content.split('\n')
+        line_width = len(str(len(lines)))
+
+        numbered_lines = []
+        for i, line in enumerate(lines, 1):
+            line_num_str = str(i).rjust(line_width)
+            numbered_lines.append(f"{line_num_str} | {line}")
+
+        return "\n".join(numbered_lines)
+
 
 class MRComment(BaseModel):
     """

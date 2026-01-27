@@ -35,9 +35,22 @@ class CodeReviewer:
         if not self.langfuse:
             return None, nullcontext()
 
+        # Build detailed file info for trace
+        files_info = []
+        for diff in merge_request.file_diffs:
+            file_info = {
+                "file_path": diff.file_path,
+                "full_file_lines": len(diff.full_content.splitlines()) if diff.full_content else 0,
+                "diff_lines": len(diff.format_with_line_numbers().splitlines()) if diff.hunks else 0,
+            }
+            files_info.append(file_info)
+
         trace = self.langfuse.start_span(
             name="review_code",
-            input={"file_count": len(merge_request.file_diffs)},
+            input={
+                "file_count": len(merge_request.file_diffs),
+                "files": files_info,
+            },
             metadata={"merge_request_id": merge_request.id},
         )
         context = propagate_attributes(

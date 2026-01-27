@@ -126,6 +126,13 @@ class CodeReviewContextBuilder:
         """Format a single file diff with line numbers."""
         content = f"--- FILE: {diff.file_path} ---\n"
 
+        # For new files, only show full content with line numbers (diff would be redundant)
+        if diff.is_new_file:
+            content += "NEW FILE:\n"
+            content += diff.format_content_with_line_numbers()
+            content += "\n"
+            return content
+
         # Include full file if available (for context)
         if diff.full_content:
             content += "FULL FILE CONTENT (for context):\n```\n"

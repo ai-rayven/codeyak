@@ -13,6 +13,7 @@ from git.exc import InvalidGitRepositoryError
 
 from ...protocols import VCSClient
 from ...domain.models import FileDiff, GuidelineViolation, MRComment, Commit, HistoricalCommit
+from ...domain.constants import CODE_FILE_EXTENSIONS
 from .diff_parser import UnifiedDiffParser
 
 
@@ -69,7 +70,7 @@ class LocalGitAdapter(VCSClient):
 
     def get_diff(self, mr_id: str) -> List[FileDiff]:
         """
-        Get diff of uncommitted changes (both staged and unstaged).
+        Get diff of uncommitted changes (both staged and unstaged) and untracked files.
 
         Args:
             mr_id: Ignored for local git (kept for protocol compatibility)
@@ -82,10 +83,30 @@ class LocalGitAdapter(VCSClient):
         head_commit = self.repo.head.commit
         diffs = head_commit.diff(None, create_patch=True)
 
-        if not diffs:
-            return []
+        file_diffs = self._parse_git_diffs(diffs) if diffs else []
 
-        return self._parse_git_diffs(diffs)
+        # Include untracked files (new files not yet added to git)
+        for file_path in self.repo.untracked_files:
+            if not self._is_code_file(file_path):
+                continue
+
+            content = self.get_file_content("", file_path)
+            if content is None:
+                continue
+
+            file_diffs.append(FileDiff(
+                file_path=file_path,
+                hunks=[],
+                full_content=content,
+                raw_diff="",
+                is_new_file=True
+            ))
+
+        return file_diffs
+
+    def _is_code_file(self, file_path: str) -> bool:
+        """Check if a file is a code file based on extension."""
+        return any(file_path.endswith(ext) for ext in CODE_FILE_EXTENSIONS)
 
     def _parse_git_diffs(self, diffs) -> List[FileDiff]:
         """Parse GitPython diff objects into FileDiff objects."""
