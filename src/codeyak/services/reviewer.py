@@ -86,9 +86,10 @@ class CodeReviewer:
             if comment.is_codeyak_summary():
                 self.progress.info(f"[{merge_request.author}] Change summary already exists, skipping review")
                 if trace:
-                    tags = [merge_request.project_name or "local", "skipped"]
-                    trace.update_trace(output={"skipped": True, "reason": "change_summary_exists"}, tags=tags)
-                    trace.end()
+                    with propagate_context:
+                        tags = [merge_request.project_name or "local", "skipped"]
+                        trace.update_trace(output={"skipped": True, "reason": "change_summary_exists"}, tags=tags)
+                        trace.end()
                 return
 
         with propagate_context:
