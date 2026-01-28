@@ -29,7 +29,6 @@ class MergeRequestFeedbackPublisher(FeedbackPublisher):
         Post all violations from a review result as comments on the merge request.
 
         Filters out low and medium confidence violations and only posts high confidence ones.
-        Also filters out false positives (where reasoning indicates no actual violation).
         If posting an inline comment fails due to the line not being in the diff, the comment
         is skipped (only inline comments on actual diff lines are posted).
 
@@ -41,11 +40,6 @@ class MergeRequestFeedbackPublisher(FeedbackPublisher):
         """
         posted_count = 0
         for violation in review_result.violations:
-            # Filter false positives (reasoning indicates no actual violation)
-            if violation.is_false_positive():
-                console.print(f"     [warning]Skipping false positive:[/warning] [guideline]{violation.guideline_id}[/guideline] in [filepath]{violation.file_path}[/filepath]")
-                continue
-
             # Filter low-confidence violations
             if violation.confidence == "low" or violation.confidence == "medium":
                 console.print(f"     [warning]Skipping {violation.confidence}-confidence:[/warning] [guideline]{violation.guideline_id}[/guideline] in [filepath]{violation.file_path}[/filepath]")
