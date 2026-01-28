@@ -192,7 +192,7 @@ class CodeReviewer:
             trace: Langfuse trace object (None if tracing disabled)
         """
         console.print()
-        console.print(Rule("[brand]Generating MR Summary[/brand]", style=BRAND_BORDER))
+        console.print(Rule("[brand]Generating MR Summary[/brand]", style=BRAND_BORDER, align="left"))
 
         # Generate summary using LLM (with tracing)
         self.progress.start_status("Generating summary...")
@@ -238,10 +238,7 @@ class CodeReviewer:
 
         for filename, guidelines in guideline_sets.items():
             console.print()
-            console.print(Rule(
-                f"[brand]Reviewing with {filename}[/brand] [muted]({len(guidelines)} guidelines)[/muted]",
-                style=BRAND_BORDER
-            ))
+            console.print(f"[brand]Reviewing with {filename}[/brand] [muted]({len(guidelines)} guidelines)[/muted]")
 
             result = self._get_review_result_traced(merge_request, summary, filename, guidelines, trace)
 
@@ -313,5 +310,3 @@ class CodeReviewer:
                 generate_summary=False,
                 is_local=True
             )
-
-        self.progress.success("Review complete.")

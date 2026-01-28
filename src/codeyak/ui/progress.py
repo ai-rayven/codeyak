@@ -82,7 +82,7 @@ class RichProgressReporter:
 
     def start_status(self, message: str) -> Any:
         """Start a status spinner and return a context handle."""
-        self._status = console.status(f"[info]{message}[/info]", spinner="dots")
+        self._status = console.status(f"[info]{message}[/info]", spinner="dots", spinner_style="#A0522D")
         self._status.start()
         return self._status
 

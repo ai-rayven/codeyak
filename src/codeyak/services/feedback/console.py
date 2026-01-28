@@ -5,12 +5,11 @@ Console feedback publisher for outputting review results to the terminal.
 from collections import defaultdict
 from typing import Dict, List
 
-from rich.panel import Panel
 from rich.table import Table
 
 from ...domain.models import ReviewResult, GuidelineViolation
 from ...protocols import FeedbackPublisher
-from ...ui import console, BRAND_BORDER
+from ...ui import console
 
 
 class ConsoleFeedbackPublisher(FeedbackPublisher):
@@ -65,12 +64,6 @@ class ConsoleFeedbackPublisher(FeedbackPublisher):
             total_filtered_violations: Total number of violations after filtering duplicates
         """
         console.print()
-        console.print(Panel(
-            "[brand]CodeYak Review[/brand]",
-            border_style=BRAND_BORDER,
-            padding=(0, 2)
-        ))
-        console.print()
 
         if not self._violations_by_file:
             console.print("[success]No high-confidence violations found. Code looks good.[/success]")
@@ -102,16 +95,11 @@ class ConsoleFeedbackPublisher(FeedbackPublisher):
 
         high_count = self._total_posted
         if high_count > 0:
-            summary_table.add_row("Violations", f"[warning]{high_count} high[/warning]")
+            summary_table.add_row("Violations", f"[warning]{high_count}[/warning]")
         else:
             summary_table.add_row("Violations", "[success]0[/success]")
 
-        console.print(Panel(
-            summary_table,
-            title="[brand]Summary[/brand]",
-            border_style=BRAND_BORDER,
-            padding=(0, 1)
-        ))
+        console.print(summary_table)
 
     def post_general_comment(self, message: str) -> None:
         """No-op for console output - general comments are not printed."""

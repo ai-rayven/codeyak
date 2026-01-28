@@ -1,11 +1,5 @@
 """
 Shared Rich console instance with CodeYak brand theme.
-
-Brand colors derived from the CodeYak logo:
-- Brown yak: #A0522D (sienna)
-- Green checkmark: #4CAF50
-- Tablet code: cyan + orange/yellow highlights
-- Cream background: #F5F5DC
 """
 
 from rich.console import Console
