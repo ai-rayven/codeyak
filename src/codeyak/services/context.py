@@ -78,18 +78,20 @@ class CodeReviewContextBuilder:
 
         content += (
             "\nInstructions:\n"
-            "1. Only report violations of the specific guidelines listed above.\n"
-            "2. Evaluate the code changes shown in the diff carefully.\n"
-            "3. Distinguish between test code and production code.\n"
-            "4. Look for project-specific patterns and conventions that may address concerns.\n"
-            "5. Set confidence to 'low' if you're uncertain due to missing context.\n"
-            "6. Set confidence to 'high' only for clear, unambiguous violations.\n"
-            "7. Ignore general best practices not in the list.\n"
+            "1. Only report ACTUAL violations of the specific guidelines listed above.\n"
+            "2. DO NOT include entries where no violation was found - only report real problems.\n"
+            "3. Evaluate the code changes shown in the diff carefully.\n"
+            "4. Distinguish between test code and production code.\n"
+            "5. Look for project-specific patterns and conventions that may address concerns.\n"
+            "6. Set confidence to 'low' if you're uncertain due to missing context.\n"
+            "7. Set confidence to 'high' only for clear, unambiguous violations.\n"
+            "8. Ignore general best practices not in the list.\n"
+            "9. If there are no violations, return an empty list - do not add positive comments.\n"
         )
 
         if existing_comments:
             content += (
-                "8. You have access to existing review comments below. "
+                "10. You have access to existing review comments below. "
                 "Use them as context but still report any violations you find. "
                 "The system will deduplicate overlapping comments.\n"
             )
