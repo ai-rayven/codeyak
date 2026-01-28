@@ -28,6 +28,7 @@ class ConsoleFeedbackPublisher(FeedbackPublisher):
         Print all violations from a review result to the console.
 
         Filters out low and medium confidence violations and only shows high confidence ones.
+        Also filters out false positives (where reasoning indicates no actual violation).
 
         Args:
             review_result: Review result containing violations to display
@@ -38,6 +39,10 @@ class ConsoleFeedbackPublisher(FeedbackPublisher):
         posted_count = 0
 
         for violation in review_result.violations:
+            # Filter false positives (reasoning indicates no actual violation)
+            if violation.is_false_positive():
+                continue
+
             # Filter low-confidence violations
             if violation.confidence in ("low", "medium"):
                 continue

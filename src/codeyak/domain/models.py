@@ -344,6 +344,37 @@ class GuidelineViolation(BaseModel):
         description="Confidence level: 'low', 'medium', or 'high'. Use 'low' when context is unclear."
     )
 
+    def is_false_positive(self) -> bool:
+        """
+        Check if this violation is actually a false positive based on the reasoning text.
+
+        The LLM sometimes returns "violations" where the reasoning indicates there's
+        actually no violation (e.g., "No violation", "correctly follows the guideline").
+
+        Returns:
+            True if the reasoning indicates this is not actually a violation.
+        """
+        reasoning_lower = self.reasoning.lower()
+
+        # Phrases that indicate this is NOT actually a violation
+        false_positive_indicators = [
+            "no violation",
+            "not a violation",
+            "no issue",
+            "does not violate",
+            "doesn't violate",
+            "correctly follows",
+            "correctly implements",
+            "properly follows",
+            "properly implements",
+            "adheres to the guideline",
+            "follows the guideline",
+            "complies with",
+            "is compliant",
+        ]
+
+        return any(indicator in reasoning_lower for indicator in false_positive_indicators)
+
     def to_comment(self) -> str:
         """Formats the output for GitLab inline comments"""
         return f"**Violation of {self.guideline_id}**: {self.reasoning}"
