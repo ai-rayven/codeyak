@@ -65,6 +65,7 @@ class CodeReviewer:
         return trace, context
 
     def review_merge_request(self, merge_request_id: str):
+        self.progress.start_timer()
         self.progress.info(f"Starting review for MR {merge_request_id}...")
 
         # Load data first
@@ -87,8 +88,6 @@ class CodeReviewer:
                 trace=trace,
                 generate_summary=True,
             )
-
-        self.progress.success("Review complete.")
 
     def _get_review_result_traced(
         self,
@@ -266,8 +265,8 @@ class CodeReviewer:
             trace.update_trace(output={"violation_count": total_filtered_violations}, tags=tags)
             trace.end()
 
-        # Post review summary
-        console.print()
+        # Show completion status with time, then violations
+        self.progress.success(f"Review complete in {self.progress.format_elapsed_time()}")
         console.print(Rule(style=BRAND_BORDER))
         self.feedback.post_review_summary(
             total_original_violations,
@@ -281,6 +280,7 @@ class CodeReviewer:
         Uses CodeProvider to get filtered diffs as a MergeRequest,
         loads guidelines locally, and runs the review without summary generation.
         """
+        self.progress.start_timer()
         self.progress.info("Starting review of local changes...")
 
         # Get merge request with filtered diffs

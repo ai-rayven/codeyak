@@ -5,8 +5,6 @@ Console feedback publisher for outputting review results to the terminal.
 from collections import defaultdict
 from typing import Dict, List
 
-from rich.table import Table
-
 from ...domain.models import ReviewResult, GuidelineViolation
 from ...protocols import FeedbackPublisher
 from ...ui import console
@@ -82,24 +80,6 @@ class ConsoleFeedbackPublisher(FeedbackPublisher):
                     )
                     console.print(f"    {violation.reasoning}")
                 console.print()
-
-        # Summary table
-        summary_table = Table(show_header=False, box=None, padding=(0, 1))
-        summary_table.add_column("Label", style="muted")
-        summary_table.add_column("Value")
-
-        summary_table.add_row(
-            "Files with violations",
-            str(len(self._violations_by_file))
-        )
-
-        high_count = self._total_posted
-        if high_count > 0:
-            summary_table.add_row("Violations", f"[warning]{high_count}[/warning]")
-        else:
-            summary_table.add_row("Violations", "[success]0[/success]")
-
-        console.print(summary_table)
 
     def post_general_comment(self, message: str) -> None:
         """No-op for console output - general comments are not printed."""

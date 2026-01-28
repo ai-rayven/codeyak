@@ -137,6 +137,18 @@ class ProgressReporter(Protocol):
         """Stop the status spinner."""
         ...
 
+    def start_timer(self) -> None:
+        """Start the session timer. Called at the beginning of a review."""
+        ...
+
+    def get_elapsed_time(self) -> float:
+        """Get the total elapsed time in seconds since start_timer()."""
+        ...
+
+    def format_elapsed_time(self) -> str:
+        """Get formatted elapsed time string (e.g., '1:23' or '1:23:45')."""
+        ...
+
 
 class FeedbackPublisher(Protocol):
     """Protocol for publishing review feedback."""

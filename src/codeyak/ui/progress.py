@@ -7,13 +7,24 @@ Provides three implementations:
 - NullProgressReporter: Silent for tests
 """
 
+import time
 from typing import Any
 
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 from rich.text import Text
 
 from .console import console, BRAND_BORDER
+
+
+def format_duration(seconds: float) -> str:
+    """Format seconds as HH:MM:SS or MM:SS depending on duration."""
+    total_seconds = int(seconds)
+    hours, remainder = divmod(total_seconds, 3600)
+    minutes, secs = divmod(remainder, 60)
+    if hours > 0:
+        return f"{hours}:{minutes:02d}:{secs:02d}"
+    return f"{minutes}:{secs:02d}"
 
 
 class RichProgressReporter:
@@ -26,10 +37,14 @@ class RichProgressReporter:
     def __init__(self):
         self._progress: Progress | None = None
         self._status: Any = None
+        self._status_progress: Progress | None = None
+        self._status_task: Any = None
+        self._session_start_time: float | None = None
 
     def banner(self, name: str, version: str) -> None:
         """Display a styled application banner."""
         title = Text()
+        title.append("🐻 ", style="bold")
         title.append(name, style="bold #A0522D")
         title.append(f" v{version}", style="dim")
         panel = Panel(
@@ -81,16 +96,38 @@ class RichProgressReporter:
             self._progress = None
 
     def start_status(self, message: str) -> Any:
-        """Start a status spinner and return a context handle."""
-        self._status = console.status(f"[info]{message}[/info]", spinner="dots", spinner_style="#A0522D")
-        self._status.start()
-        return self._status
+        """Start a status spinner with live elapsed time display."""
+        self._status_progress = Progress(
+            SpinnerColumn(spinner_name="dots", style="#A0522D"),
+            TextColumn("[info]{task.description}[/info]"),
+            TimeElapsedColumn(),
+            console=console,
+            transient=True,
+        )
+        self._status_progress.start()
+        self._status_task = self._status_progress.add_task(message, total=None)
+        return self._status_task
 
     def stop_status(self) -> None:
         """Stop the status spinner."""
-        if self._status:
-            self._status.stop()
-            self._status = None
+        if self._status_progress:
+            self._status_progress.stop()
+            self._status_progress = None
+            self._status_task = None
+
+    def start_timer(self) -> None:
+        """Start the session timer."""
+        self._session_start_time = time.monotonic()
+
+    def get_elapsed_time(self) -> float:
+        """Get the total elapsed time in seconds since start_timer()."""
+        if self._session_start_time is None:
+            return 0.0
+        return time.monotonic() - self._session_start_time
+
+    def format_elapsed_time(self) -> str:
+        """Get formatted elapsed time string."""
+        return format_duration(self.get_elapsed_time())
 
 
 class CIProgressReporter:
@@ -101,9 +138,12 @@ class CIProgressReporter:
     with CI/CD systems like GitLab CI, GitHub Actions, etc.
     """
 
+    def __init__(self):
+        self._session_start_time: float | None = None
+
     def banner(self, name: str, version: str) -> None:
         """Display a simple text banner."""
-        print(f"=== {name} v{version} ===")
+        print(f"=== 🐻 {name} v{version} ===")
 
     def info(self, message: str) -> None:
         """Display an informational message."""
@@ -147,6 +187,20 @@ class CIProgressReporter:
         """Stop the status spinner (no-op in CI mode)."""
         pass
 
+    def start_timer(self) -> None:
+        """Start the session timer."""
+        self._session_start_time = time.monotonic()
+
+    def get_elapsed_time(self) -> float:
+        """Get the total elapsed time in seconds since start_timer()."""
+        if self._session_start_time is None:
+            return 0.0
+        return time.monotonic() - self._session_start_time
+
+    def format_elapsed_time(self) -> str:
+        """Get formatted elapsed time string."""
+        return format_duration(self.get_elapsed_time())
+
 
 class NullProgressReporter:
     """
@@ -155,6 +209,9 @@ class NullProgressReporter:
     All methods are no-ops, useful for unit testing business logic
     without any console output.
     """
+
+    def __init__(self):
+        self._session_start_time: float | None = None
 
     def banner(self, name: str, version: str) -> None:
         """No-op."""
@@ -195,3 +252,17 @@ class NullProgressReporter:
     def stop_status(self) -> None:
         """No-op."""
         pass
+
+    def start_timer(self) -> None:
+        """Start the session timer (tracks time for testing)."""
+        self._session_start_time = time.monotonic()
+
+    def get_elapsed_time(self) -> float:
+        """Get the total elapsed time in seconds since start_timer()."""
+        if self._session_start_time is None:
+            return 0.0
+        return time.monotonic() - self._session_start_time
+
+    def format_elapsed_time(self) -> str:
+        """Get formatted elapsed time string."""
+        return format_duration(self.get_elapsed_time())

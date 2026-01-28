@@ -8,3 +8,4 @@ TODO:
     - think about what you are reviewing, is it SDK, microservice, API? etc
 
 
+- in some cases when reviewing the code, the model may not have enough context about new language features and decides that it is invalid syntax and flag it
