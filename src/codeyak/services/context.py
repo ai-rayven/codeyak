@@ -79,7 +79,7 @@ class CodeReviewContextBuilder:
         content += (
             "\nInstructions:\n"
             "1. Only report violations of the specific guidelines listed above.\n"
-            "2. Consider the full file context when evaluating changes - not just the diff.\n"
+            "2. Evaluate the code changes shown in the diff carefully.\n"
             "3. Distinguish between test code and production code.\n"
             "4. Look for project-specific patterns and conventions that may address concerns.\n"
             "5. Set confidence to 'low' if you're uncertain due to missing context.\n"
@@ -132,12 +132,6 @@ class CodeReviewContextBuilder:
             content += diff.format_content_with_line_numbers()
             content += "\n"
             return content
-
-        # Include full file if available (for context)
-        if diff.full_content:
-            content += "FULL FILE CONTENT (for context):\n```\n"
-            content += diff.full_content
-            content += "\n```\n\n"
 
         # Include diff with line numbers (shows what changed)
         content += "CHANGES (what was modified):\n"
