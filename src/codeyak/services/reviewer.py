@@ -1,15 +1,17 @@
+import time
 from typing import Any, ContextManager, Dict, List, Tuple
 from contextlib import nullcontext
 from rich.rule import Rule
 
 from codeyak.protocols import LLMClient, FeedbackPublisher, ProgressReporter
+from codeyak.ui.progress import format_duration
 from codeyak.domain.models import ChangeSummary, Guideline, MergeRequest, ReviewResult, MRComment
 from codeyak.domain.constants import CODE_FILE_EXTENSIONS
 from codeyak.ui import console, BRAND_BORDER, NullProgressReporter
 from langfuse import propagate_attributes
 
 from .guidelines import GuidelinesProvider
-from .context import CodeReviewContextBuilder
+from .context_builder import CodeReviewContextBuilder
 from .code import CodeProvider
 from .summary import SummaryGenerator
 
@@ -105,7 +107,8 @@ class CodeReviewer:
         change_summary: ChangeSummary,
         guidelines_filename: str,
         guidelines: List[Guideline],
-        trace
+        trace,
+        smart_context: str | None = None,
     ) -> ReviewResult:
         """
         Generate review result using LLM with Langfuse tracing.
@@ -114,6 +117,7 @@ class CodeReviewer:
             merge_request: The merge request containing file diffs and comments
             guidelines: List of guidelines to apply during review
             trace: Langfuse trace object (None if tracing disabled)
+            smart_context: Pre-built smart context string (from build_smart_context())
 
         Returns:
             ReviewResult: The generated review result from the LLM
@@ -122,7 +126,9 @@ class CodeReviewer:
         messages = self.context.build_review_messages(
             merge_request,
             change_summary,
-            guidelines
+            guidelines,
+            trace=trace,
+            smart_context=smart_context,
         )
 
         # Start generation span if tracing enabled
@@ -236,6 +242,15 @@ class CodeReviewer:
             trace: Langfuse trace object (None if tracing disabled)
             generate_summary: Whether to generate and post a summary
         """
+        # Build smart context once for all guideline sets
+        smart_context = self.context.build_smart_context(
+            merge_request.file_diffs,
+            trace=trace
+        )
+
+        # Track when review/analysis starts (after context building)
+        review_start_time = time.monotonic()
+
         # Generate and post summary if requested
         summary = None
         if generate_summary:
@@ -249,7 +264,9 @@ class CodeReviewer:
             console.print()
             console.print(f"[brand]Reviewing with {filename}[/brand] [muted]({len(guidelines)} guidelines)[/muted]")
 
-            result = self._get_review_result_traced(merge_request, summary, filename, guidelines, trace)
+            result = self._get_review_result_traced(
+                merge_request, summary, filename, guidelines, trace, smart_context
+            )
 
             # Filter duplicates and track both counts
             filtered_result, original_count = self._filter_existing_violations(
@@ -275,13 +292,15 @@ class CodeReviewer:
             trace.update_trace(output={"violation_count": total_filtered_violations}, tags=tags)
             trace.end()
 
-        # Show completion status with time, then violations
-        self.progress.success(f"Review complete in {self.progress.format_elapsed_time()}")
+        # Show review time (analysis only), then violations, then total time
+        review_elapsed = time.monotonic() - review_start_time
+        self.progress.success(f"Review complete in {format_duration(review_elapsed)}")
         console.print(Rule(style=BRAND_BORDER))
         self.feedback.post_review_summary(
             total_original_violations,
             total_filtered_violations
         )
+        self.progress.success(f"Total time: {self.progress.format_elapsed_time()}")
 
     def review_local_changes(self) -> None:
         """

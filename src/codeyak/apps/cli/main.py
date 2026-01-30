@@ -153,7 +153,12 @@ def review(path: Path | None):
         )
 
     # Initialize services - CodeProvider handles all MergeRequest construction
-    context = CodeReviewContextBuilder()
+    context = CodeReviewContextBuilder(
+        llm_client=llm,
+        repo_path=repo_path,
+        use_smart_context=True,
+        progress=progress,
+    )
     guidelines = GuidelinesProvider(vcs)
     code = CodeProvider(vcs)
     feedback = ConsoleFeedbackPublisher()
@@ -239,12 +244,18 @@ def mr(mr_id: str, project_id: str | None):
         )
 
     # Initialize services
-    context = CodeReviewContextBuilder()
+    # Use current directory as repo path - in CI, the repo is checked out
+    progress = CIProgressReporter()
+    context = CodeReviewContextBuilder(
+        llm_client=llm,
+        repo_path=Path.cwd(),
+        use_smart_context=True,
+        progress=progress,
+    )
     guidelines = GuidelinesProvider(vcs)
     code = CodeProvider(vcs)
     feedback = MergeRequestFeedbackPublisher(vcs, mr_id)
     summary = SummaryGenerator(llm, langfuse)
-    progress = CIProgressReporter()
 
     # Create reviewer and run
     bot = CodeReviewer(

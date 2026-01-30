@@ -7,7 +7,7 @@ Contains business logic and orchestration.
 from .reviewer import CodeReviewer
 from .guidelines import GuidelinesProvider, GuidelinesGenerator
 from .code import CodeProvider
-from .context import CodeReviewContextBuilder
+from .context_builder import CodeReviewContextBuilder
 from .feedback import MergeRequestFeedbackPublisher, ConsoleFeedbackPublisher
 from .summary import SummaryGenerator
 
