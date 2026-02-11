@@ -375,6 +375,9 @@ class HistoricalCommit(BaseModel):
     date: str = Field(..., description="Commit date as ISO string")
     files_changed: List[str] = Field(default_factory=list, description="List of file paths changed")
     diff_summary: str = Field(default="", description="Truncated diff content for LLM analysis")
+    signal: Optional['CommitSignal'] = Field(default=None, description="Classification for learning potential")
+    signal_confidence: Optional[str] = Field(default=None, description="Confidence in classification")
+    signal_reasoning: Optional[str] = Field(default=None, description="Why this classification was assigned")
 
 
 class CommitBatch(BaseModel):
@@ -409,3 +412,34 @@ class ConsolidatedGuidelines(BaseModel):
     Final deduplicated guidelines after consolidation.
     """
     guidelines: List[GeneratedGuideline] = Field(default_factory=list, description="Final consolidated guidelines")
+
+
+# --- Commit Classification Domain Models ---
+
+class CommitSignal(str, Enum):
+    """Classification of commit for learning potential."""
+    BUG_FIX = "bug_fix"
+    REVERT = "revert"
+    REFACTOR = "refactor"
+    SECURITY_FIX = "security_fix"
+    FEATURE = "feature"
+    DOCUMENTATION = "documentation"
+    CHORE = "chore"
+    MERGE = "merge"
+    STYLE = "style"
+
+
+class CommitClassification(BaseModel):
+    """Classification result for a single commit."""
+    sha: str = Field(..., description="Commit SHA (first 8 characters)")
+    signal: CommitSignal = Field(..., description="Type of commit")
+    confidence: str = Field(default="medium", description="low, medium, or high")
+    reasoning: str = Field(..., description="Brief explanation of classification")
+
+
+class CommitClassificationBatch(BaseModel):
+    """Result from classifying a batch of commits."""
+    classifications: List[CommitClassification] = Field(
+        default_factory=list,
+        description="Classifications for each commit in the batch"
+    )

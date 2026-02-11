@@ -18,9 +18,19 @@ from codeyak.domain.models import (
     GeneratedGuideline,
     GuidelineGenerationResult,
     ConsolidatedGuidelines,
+    CommitSignal,
+    CommitClassificationBatch,
 )
 from codeyak.domain.constants import CODE_FILE_EXTENSIONS
 from codeyak.ui import NullProgressReporter
+
+
+# High-signal commit types that have learning potential
+HIGH_SIGNAL_TYPES = {
+    CommitSignal.BUG_FIX,
+    CommitSignal.REVERT,
+    CommitSignal.SECURITY_FIX,
+}
 
 
 class GuidelinesGenerator:
@@ -32,6 +42,7 @@ class GuidelinesGenerator:
     """
 
     BATCH_SIZE = 50
+    CLASSIFICATION_BATCH_SIZE = 25
     MAX_DIFF_LINES = 100
     MAX_GUIDELINES_PER_BATCH = 10
     MAX_FINAL_GUIDELINES = 20
@@ -127,11 +138,22 @@ class GuidelinesGenerator:
         self.progress.info("Fetching diff summaries...")
         commits = self._enrich_with_diffs(commits)
 
-        # 4. Batch commits
+        # 4. Classify commits and filter to high-signal
+        commits = self._classify_commits(commits, trace=trace)
+        commits = self._filter_high_signal_commits(commits)
+
+        if not commits:
+            self.progress.warning("No high-signal commits found after classification.")
+            if trace:
+                trace.update_trace(output={"guideline_count": 0}, tags=[project_name, "no_high_signal"])
+                trace.end()
+            return self._format_empty_yaml()
+
+        # 5. Batch commits
         batches = self._batch_commits(commits)
         self.progress.info(f"Created {len(batches)} batches for analysis.")
 
-        # 5. Analyze each batch with progress bar
+        # 6. Analyze each batch with progress bar
         all_guidelines: List[GeneratedGuideline] = []
 
         task = self.progress.start_progress("Analyzing batches...", total=len(batches))
@@ -156,7 +178,7 @@ class GuidelinesGenerator:
                 trace.end()
             return self._format_empty_yaml()
 
-        # 6. Consolidate guidelines
+        # 7. Consolidate guidelines
         self.progress.info(f"Consolidating {len(all_guidelines)} guidelines...")
         self.progress.start_status("Consolidating guidelines...")
         try:
@@ -173,7 +195,7 @@ class GuidelinesGenerator:
             )
             trace.end()
 
-        # 7. Format as YAML
+        # 8. Format as YAML
         return self._format_as_yaml(consolidated)
 
     def _filter_code_commits(self, commits: List[HistoricalCommit]) -> List[HistoricalCommit]:
@@ -212,6 +234,193 @@ class GuidelinesGenerator:
                 diff_summary=diff_summary,
             ))
         return enriched
+
+    def _classify_commits(
+        self,
+        commits: List[HistoricalCommit],
+        trace=None
+    ) -> List[HistoricalCommit]:
+        """Classify commits by their learning potential using LLM."""
+        if not commits:
+            return commits
+
+        self.progress.info(f"Classifying {len(commits)} commits...")
+        classified = []
+        total_batches = (len(commits) + self.CLASSIFICATION_BATCH_SIZE - 1) // self.CLASSIFICATION_BATCH_SIZE
+
+        task = self.progress.start_progress("Classifying commits...", total=total_batches)
+        try:
+            for i in range(0, len(commits), self.CLASSIFICATION_BATCH_SIZE):
+                batch = commits[i:i + self.CLASSIFICATION_BATCH_SIZE]
+                batch_num = (i // self.CLASSIFICATION_BATCH_SIZE) + 1
+
+                self.progress.update_progress(
+                    task,
+                    f"Classifying batch {batch_num}/{total_batches}"
+                )
+
+                messages = self._build_classification_messages(batch)
+
+                # Start generation if tracing
+                generation = None
+                if trace:
+                    generation = trace.start_generation(
+                        name=f"classify_batch_{batch_num}",
+                        input=messages,
+                    )
+
+                response = self.llm.generate(messages, response_model=CommitClassificationBatch)
+
+                # End generation with output
+                if generation:
+                    generation.update(
+                        model=response.model,
+                        output=response.result.model_dump_json(),
+                        usage_details={
+                            "input": response.token_usage.prompt_tokens,
+                            "output": response.token_usage.completion_tokens,
+                        }
+                    )
+                    generation.end()
+
+                # Map classifications back to commits
+                classifications_by_sha = {
+                    c.sha: c for c in response.result.classifications
+                }
+
+                for commit in batch:
+                    sha_prefix = commit.sha[:8]
+                    classification = classifications_by_sha.get(sha_prefix)
+
+                    if classification:
+                        classified.append(HistoricalCommit(
+                            sha=commit.sha,
+                            message=commit.message,
+                            author=commit.author,
+                            date=commit.date,
+                            files_changed=commit.files_changed,
+                            diff_summary=commit.diff_summary,
+                            signal=classification.signal,
+                            signal_confidence=classification.confidence,
+                            signal_reasoning=classification.reasoning,
+                        ))
+                    else:
+                        # If not classified, default to CHORE (low signal)
+                        classified.append(HistoricalCommit(
+                            sha=commit.sha,
+                            message=commit.message,
+                            author=commit.author,
+                            date=commit.date,
+                            files_changed=commit.files_changed,
+                            diff_summary=commit.diff_summary,
+                            signal=CommitSignal.CHORE,
+                            signal_confidence="low",
+                            signal_reasoning="Not classified by LLM",
+                        ))
+
+                self.progress.advance_progress(task)
+        finally:
+            self.progress.stop_progress()
+
+        return classified
+
+    def _build_classification_messages(self, commits: List[HistoricalCommit]) -> List[dict]:
+        """Construct LLM prompts for commit classification."""
+        system_prompt = """You are an expert at classifying git commits by their learning potential for code review guidelines.
+
+## CLASSIFICATION CATEGORIES
+
+**High-signal (valuable for learning):**
+- `bug_fix` - Fixes a bug, reveals what went wrong
+- `revert` - Reverts a change, indicates something was problematic
+- `refactor` - Restructures code without changing behavior, shows improvement patterns
+- `security_fix` - Addresses security vulnerabilities, critical learning opportunity
+
+**Low-signal (less valuable for learning):**
+- `feature` - New functionality, doesn't reveal mistakes
+- `documentation` - Doc changes don't teach code patterns
+- `chore` - Dependency updates, CI, config changes
+- `merge` - Just integration points
+- `style` - Formatting, whitespace, naming only
+
+## CLASSIFICATION STRATEGY
+
+1. **Look at commit message keywords:**
+   - "fix", "bug", "issue", "error", "crash" → likely `bug_fix`
+   - "revert" → `revert`
+   - "refactor", "restructure", "reorganize", "cleanup" → `refactor`
+   - "security", "vulnerability", "CVE", "XSS", "injection" → `security_fix`
+   - "feat", "add", "implement", "new" → `feature`
+   - "docs", "readme", "comment" → `documentation`
+   - "chore", "deps", "ci", "build", "config" → `chore`
+   - "merge" → `merge`
+   - "style", "format", "lint" → `style`
+
+2. **Examine the diff for patterns:**
+   - Small, targeted changes often indicate bug fixes
+   - Test additions with fixes suggest bug fixes
+   - Pure whitespace/formatting → style
+   - Large structural changes with same logic → refactor
+
+3. **When uncertain, default to low-signal** (feature, chore, or style)
+
+## OUTPUT
+
+For each commit, provide:
+- sha: First 8 characters of the commit SHA
+- signal: One of the classification categories
+- confidence: "low", "medium", or "high"
+- reasoning: Brief explanation (1 sentence)"""
+
+        commits_text = []
+        for commit in commits:
+            files_str = ", ".join(commit.files_changed[:5])
+            if len(commit.files_changed) > 5:
+                files_str += f" (+{len(commit.files_changed) - 5} more)"
+
+            # Truncate message and diff for classification
+            message = commit.message[:500]
+            diff_excerpt = commit.diff_summary[:1000] if commit.diff_summary else "(no diff)"
+
+            commits_text.append(f"""
+---
+**SHA:** {commit.sha[:8]}
+**Message:** {message}
+**Files:** {files_str}
+**Diff excerpt:**
+```
+{diff_excerpt}
+```
+""")
+
+        user_prompt = f"""Classify the following {len(commits)} commits by their learning potential:
+
+{"".join(commits_text)}
+
+Return a classification for each commit."""
+
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+    def _filter_high_signal_commits(
+        self,
+        commits: List[HistoricalCommit]
+    ) -> List[HistoricalCommit]:
+        """Filter commits to only those with high learning potential."""
+        high_signal = [c for c in commits if c.signal in HIGH_SIGNAL_TYPES]
+
+        # Log classification summary
+        signal_counts = {}
+        for commit in commits:
+            signal = commit.signal.value if commit.signal else "unknown"
+            signal_counts[signal] = signal_counts.get(signal, 0) + 1
+
+        self.progress.info(f"Classification summary: {signal_counts}")
+        self.progress.info(f"Filtered to {len(high_signal)} high-signal commits (from {len(commits)} total).")
+
+        return high_signal
 
     def _batch_commits(self, commits: List[HistoricalCommit]) -> List[CommitBatch]:
         """Split commits into batches for LLM analysis."""
