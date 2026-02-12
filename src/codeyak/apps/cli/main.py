@@ -11,6 +11,7 @@ import sys
 from pathlib import Path
 
 import click
+import yaml
 
 from ... import __version__
 from ...config import (
@@ -338,20 +339,53 @@ def learn(days: int):
             host=get_settings().LANGFUSE_HOST
         )
 
+    # Read existing guidelines if project.yaml exists
+    codeyak_dir = repo_path / ".codeyak"
+    output_path = codeyak_dir / "project.yaml"
+    existing_guidelines = None
+
+    if output_path.exists():
+        try:
+            parsed = yaml.safe_load(output_path.read_text())
+            if parsed and isinstance(parsed.get("guidelines"), list):
+                existing_guidelines = parsed["guidelines"]
+                progress.info(f"Found {len(existing_guidelines)} existing guidelines.")
+        except Exception:
+            progress.warning("Could not parse existing project.yaml, will overwrite.")
+
     # Generate guidelines
     generator = GuidelinesGenerator(vcs=vcs, llm=llm, langfuse=langfuse, progress=progress)
-    yaml_output = generator.generate_from_history(since_days=days)
+    yaml_output = generator.generate_from_history(
+        since_days=days, existing_guidelines=existing_guidelines
+    )
 
     # Create .codeyak/ directory if it doesn't exist
-    codeyak_dir = repo_path / ".codeyak"
     codeyak_dir.mkdir(exist_ok=True)
 
-    # Write output to project.yaml
-    output_path = codeyak_dir / "project.yaml"
-    output_path.write_text(yaml_output)
+    if existing_guidelines is not None:
+        # Check if generator returned anything new
+        parsed_new = yaml.safe_load(yaml_output)
+        new_guidelines = parsed_new.get("guidelines", []) if parsed_new else []
 
-    progress.success(f"Guidelines written to {output_path}")
-    progress.info("Review and customize the generated guidelines before using them.")
+        if not new_guidelines:
+            progress.success("No new guidelines to add — existing guidelines are comprehensive.")
+        else:
+            # Append new guideline entries to the existing file
+            new_yaml_lines = generator.format_guidelines_as_yaml_entries(new_guidelines)
+            existing_content = output_path.read_text()
+            # Ensure there's a newline before appending
+            if not existing_content.endswith("\n"):
+                existing_content += "\n"
+            output_path.write_text(existing_content + new_yaml_lines)
+            progress.success(
+                f"Appended {len(new_guidelines)} new guidelines to {output_path}"
+            )
+            progress.info("Review and customize the new guidelines.")
+    else:
+        # Fresh write
+        output_path.write_text(yaml_output)
+        progress.success(f"Guidelines written to {output_path}")
+        progress.info("Review and customize the generated guidelines before using them.")
 
     # Flush Langfuse traces
     if langfuse:

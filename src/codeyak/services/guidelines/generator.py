@@ -68,12 +68,18 @@ class GuidelinesGenerator:
         self.langfuse = langfuse
         self.progress = progress or NullProgressReporter()
 
-    def generate_from_history(self, since_days: int = 365) -> str:
+    def generate_from_history(
+        self,
+        since_days: int = 365,
+        existing_guidelines: list[dict] | None = None,
+    ) -> str:
         """
         Generate guidelines from git history.
 
         Args:
             since_days: Number of days of history to analyze
+            existing_guidelines: Optional list of existing guideline dicts
+                ({label, description}) to avoid duplicating
 
         Returns:
             YAML string containing generated guidelines
@@ -87,7 +93,8 @@ class GuidelinesGenerator:
             return self._generate_from_history_traced(
                 since_days=since_days,
                 project_name=project_name,
-                trace=trace
+                trace=trace,
+                existing_guidelines=existing_guidelines,
             )
 
     def _start_trace(self, project_name: str, since_days: int):
@@ -109,7 +116,8 @@ class GuidelinesGenerator:
         self,
         since_days: int,
         project_name: str,
-        trace
+        trace,
+        existing_guidelines: list[dict] | None = None,
     ) -> str:
         """Internal method that runs within the trace context."""
         # 1. Fetch commits
@@ -182,7 +190,9 @@ class GuidelinesGenerator:
         self.progress.info(f"Consolidating {len(all_guidelines)} guidelines...")
         self.progress.start_status("Consolidating guidelines...")
         try:
-            consolidated = self._consolidate_guidelines(all_guidelines, trace=trace)
+            consolidated = self._consolidate_guidelines(
+                all_guidelines, trace=trace, existing_guidelines=existing_guidelines
+            )
         finally:
             self.progress.stop_status()
         self.progress.success(f"Final guidelines: {len(consolidated.guidelines)}")
@@ -523,13 +533,16 @@ Based on these commits, what guidelines would help prevent similar issues in fut
     def _consolidate_guidelines(
         self,
         all_guidelines: List[GeneratedGuideline],
-        trace=None
+        trace=None,
+        existing_guidelines: list[dict] | None = None,
     ) -> ConsolidatedGuidelines:
         """Deduplicate and consolidate guidelines across batches."""
-        if len(all_guidelines) <= self.MAX_FINAL_GUIDELINES:
+        # Always call LLM when existing guidelines are present (need dedup comparison),
+        # otherwise skip if candidate count is small enough
+        if not existing_guidelines and len(all_guidelines) <= self.MAX_FINAL_GUIDELINES:
             return ConsolidatedGuidelines(guidelines=all_guidelines)
 
-        messages = self._build_consolidation_messages(all_guidelines)
+        messages = self._build_consolidation_messages(all_guidelines, existing_guidelines)
 
         # Start generation if tracing
         generation = None
@@ -557,9 +570,24 @@ Based on these commits, what guidelines would help prevent similar issues in fut
 
     def _build_consolidation_messages(
         self,
-        guidelines: List[GeneratedGuideline]
+        guidelines: List[GeneratedGuideline],
+        existing_guidelines: list[dict] | None = None,
     ) -> List[dict]:
         """Construct LLM prompts for guideline consolidation."""
+        guidelines_text = []
+        for i, g in enumerate(guidelines, 1):
+            guidelines_text.append(f"""
+---
+{i}. **{g.label}** (confidence: {g.confidence}, occurrences: {g.occurrence_count})
+Description: {g.description}
+Reasoning: {g.reasoning}
+""")
+
+        if existing_guidelines:
+            return self._build_incremental_consolidation_messages(
+                guidelines_text, existing_guidelines
+            )
+
         system_prompt = """You are consolidating code review guidelines into a final, high-quality set of general principles.
 
 ## YOUR TASK
@@ -604,15 +632,6 @@ Each final guideline needs only:
 - **confidence**: high/medium/low
 - **occurrence_count**: How many times the pattern was observed"""
 
-        guidelines_text = []
-        for i, g in enumerate(guidelines, 1):
-            guidelines_text.append(f"""
----
-{i}. **{g.label}** (confidence: {g.confidence}, occurrences: {g.occurrence_count})
-Description: {g.description}
-Reasoning: {g.reasoning}
-""")
-
         user_prompt = f"""Consolidate these {len(guidelines)} guidelines into 10-15 final guidelines.
 
 Focus on:
@@ -625,6 +644,61 @@ Input guidelines:
 {"".join(guidelines_text)}
 
 Return only the highest-quality, most broadly applicable guidelines."""
+
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+    def _build_incremental_consolidation_messages(
+        self,
+        candidate_guidelines_text: list[str],
+        existing_guidelines: list[dict],
+    ) -> list[dict]:
+        """Build prompts for incremental consolidation against existing guidelines."""
+        existing_text = []
+        for i, g in enumerate(existing_guidelines, 1):
+            existing_text.append(
+                f"{i}. **{g.get('label', 'unknown')}**: {g.get('description', '')}"
+            )
+
+        system_prompt = """You are an expert at consolidating code review guidelines incrementally.
+
+You will be given two lists:
+1. **EXISTING GUIDELINES** — already saved in the project. Do NOT repeat or rephrase these.
+2. **NEW CANDIDATES** — freshly generated from recent commit analysis.
+
+## YOUR TASK
+
+Return **only** guidelines from the new candidates that add genuine value not already covered by the existing guidelines.
+
+## RULES
+
+- If a new candidate covers the same principle as an existing guideline (even with different wording), **discard it**.
+- If a new candidate is a more specific version of an existing guideline, **discard it** — the existing general version is sufficient.
+- If a new candidate covers a genuinely new area or pattern, **keep it** and generalize it.
+- Merge similar new candidates together before returning.
+- Remove generic advice any developer would know.
+- If nothing new is worth adding, return an **empty list** of guidelines.
+
+## OUTPUT FORMAT
+
+Each guideline needs:
+- **label**: Short kebab-case identifier (general, not project-specific)
+- **description**: Clear, actionable principle (1-3 sentences, no project-specific references)
+- **reasoning**: Brief explanation of why this matters
+- **confidence**: high/medium/low
+- **occurrence_count**: How many times the pattern was observed"""
+
+        user_prompt = f"""## EXISTING GUIDELINES (already covered — do not repeat)
+
+{chr(10).join(existing_text)}
+
+## NEW CANDIDATES
+
+{"".join(candidate_guidelines_text)}
+
+Return only genuinely new guidelines that are not already covered above. If nothing new is worth adding, return an empty list."""
 
         return [
             {"role": "system", "content": system_prompt},
@@ -653,6 +727,22 @@ Return only the highest-quality, most broadly applicable guidelines."""
                 lines.append(f"    #   {extra_line}")
             lines.append("")
 
+        return "\n".join(lines)
+
+    def format_guidelines_as_yaml_entries(self, guidelines: list[dict]) -> str:
+        """Format guideline dicts as YAML entries for appending to an existing file.
+
+        Args:
+            guidelines: List of guideline dicts with at least 'label' and 'description' keys.
+
+        Returns:
+            YAML-formatted string of guideline entries (without the 'guidelines:' key).
+        """
+        lines = []
+        for g in guidelines:
+            lines.append(f"  - label: {g['label']}")
+            lines.append(self._format_yaml_block("description", g["description"], indent=4))
+            lines.append("")
         return "\n".join(lines)
 
     def _format_yaml_block(self, key: str, value: str, indent: int = 0) -> str:
