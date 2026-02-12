@@ -16,6 +16,12 @@ CODEYAK_THEME = Theme({
     "line_number": "white",        # Cyan - line numbers
     "guideline": "#DEB887",       # Burlywood - guideline IDs
     "muted": "dim",               # Dimmed text
+    # Rich progress bar style overrides
+    "progress.spinner": "#A0522D",
+    "progress.percentage": "#CD853F",
+    "bar.complete": "#A0522D",
+    "bar.finished": "#CD853F",
+    "progress.elapsed": "dim",
 })
 
 # Brand border style for panels and rules

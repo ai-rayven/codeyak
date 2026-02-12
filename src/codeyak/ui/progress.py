@@ -71,7 +71,7 @@ class RichProgressReporter:
         self._progress = Progress(
             SpinnerColumn(),
             TextColumn("[progress.description]{task.description}"),
-            BarColumn(complete_style=BRAND_BORDER),
+            BarColumn(complete_style=BRAND_BORDER, finished_style="#CD853F"),
             TaskProgressColumn(),
             console=console,
         )
