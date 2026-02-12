@@ -468,45 +468,25 @@ Return a classification for each commit."""
 
     def _build_analysis_messages(self, batch: CommitBatch) -> List[dict]:
         """Construct LLM prompts for batch analysis."""
-        system_prompt = """You are an expert code reviewer analyzing git commit history to identify general principles and patterns.
+        system_prompt = """
+You are an expert code reviewer analyzing git commit history.
 
-Your goal is to extract guidelines that capture broadly applicable principles - patterns that would help any similar project, not just this specific codebase.
+Your goal is to extract guidelines that help junior developers not make the same mistake again.
 
 ## WHAT TO LOOK FOR
 
-1. **General principles** - Extract the underlying pattern, not the specific implementation
-2. **Recurring bug categories** - Classes of issues that appear across projects (e.g., input validation, async error handling)
-3. **Architectural patterns** - Broadly applicable approaches for common problems
+1. **Recurring bug categories** - Classes of issues that appear across projects (e.g., input validation, async error handling)
 
 ## GUIDELINE FORMAT
 
 Each guideline needs:
 - **label**: Short kebab-case identifier (e.g., 'responsive-layouts', 'validate-external-inputs')
-- **description**: Clear, actionable instruction explaining the general principle
-
-## DESCRIPTION QUALITY
-
-Write descriptions that capture the GENERAL principle, not project-specific details:
-- GOOD: "Use responsive layouts instead of fixed pixel dimensions"
-- BAD: "Use flex-based layouts in web/PWA flows" (too specific to one context)
-
-- GOOD: "Validate external inputs before processing"
-- BAD: "Validate API responses from the PaymentService" (too specific)
-
-- GOOD: "Handle async errors explicitly rather than silently failing"
-- BAD: "Add try-catch in fetchUserData calls" (too specific)
-
-## WHAT TO EXCLUDE
-
-Skip guidelines about:
-- Universal best practices any developer knows (e.g., "use version control")
-- Generic style/formatting rules
-- Standard tooling configurations
-- Project-specific file names, APIs, or module references
+- **description**: Clear, actionable instruction explaining the general principle that can be used by a reviewer when reviewing the code
 
 ## OUTPUT
 
-Return 3-6 guidelines per batch. Focus on extracting general principles that would apply across similar projects."""
+Return 3-6 guidelines per batch. 
+"""
 
         # Format commits for analysis
         commits_text = []
