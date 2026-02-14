@@ -343,10 +343,29 @@ class GuidelineViolation(BaseModel):
         default="medium",
         description="Confidence level: 'low', 'medium', or 'high'. Use 'low' when context is unclear."
     )
+    suggested_code: Optional[str] = Field(
+        default=None,
+        description="Replacement code for the violated line(s). Only provide when the fix is mechanical, unambiguous, and small (1-5 lines)."
+    )
+    suggestion_lines_above: int = Field(
+        default=0,
+        description="Number of lines above line_number to include in the replacement range."
+    )
+    suggestion_lines_below: int = Field(
+        default=0,
+        description="Number of lines below line_number to include in the replacement range."
+    )
 
     def to_comment(self) -> str:
         """Formats the output for GitLab inline comments"""
-        return f"**Violation of {self.guideline_id}**: {self.reasoning}"
+        body = f"**Violation of {self.guideline_id}**: {self.reasoning}"
+        if self.suggested_code is not None:
+            body += (
+                f"\n\n```suggestion:-{self.suggestion_lines_above}+{self.suggestion_lines_below}"
+                f"\n{self.suggested_code}"
+                f"\n```"
+            )
+        return body
 
     def to_general_comment(self) -> str:
         """Formats the output for general GitLab comments (with file and line reference)"""

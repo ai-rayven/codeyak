@@ -171,6 +171,27 @@ class CodeReviewContextBuilder:
                 "The system will deduplicate overlapping comments.\n"
             )
 
+        content += (
+            "\nCode Suggestions:\n"
+            "When you find a violation, you may optionally provide a `suggested_code` fix. "
+            "This will be rendered as an applicable GitLab suggestion that reviewers can accept with one click.\n\n"
+            "DO provide a suggestion when:\n"
+            "- The fix is mechanical and unambiguous (wrong name, missing check, incorrect import, hardcoded value)\n"
+            "- There is only one reasonable way to fix it\n"
+            "- The scope is small (1-5 lines)\n\n"
+            "DO NOT provide a suggestion when:\n"
+            "- The violation is architectural or design-level (e.g., class has too many responsibilities)\n"
+            "- Multiple valid fixes exist and the choice is ambiguous\n"
+            "- The fix requires changes across multiple locations\n"
+            "- Your confidence is low or medium\n"
+            "- The violation is about missing functionality rather than incorrect code\n\n"
+            "When providing a suggestion:\n"
+            "- `suggested_code` must be the complete replacement text for the affected line range\n"
+            "- Preserve the original indentation style exactly\n"
+            "- Use `suggestion_lines_above` and `suggestion_lines_below` (default 0) for multi-line replacements "
+            "that span beyond the single `line_number`\n"
+        )
+
         return content
 
     def _format_existing_comments(self, comments: List[MRComment]) -> str:

@@ -1,6 +1,6 @@
 [project]
 name = "codeyak"
-version = "0.0.12"
+version = "0.0.13"
 description = "A code review agent optimized for following strict guidelines"
 readme = "README.md"
 license = "MIT"
