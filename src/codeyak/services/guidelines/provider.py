@@ -38,9 +38,8 @@ class GuidelinesProvider:
         Load guideline sets from built-in and project-specific sources.
 
         Loading strategy:
-        1. If vcs and mr_id provided, try to fetch .codeyak/ files from repository
-        2. If no VCS files found, check local .codeyak/ directory
-        3. If no project files found, auto-load built-in 'default' guideline set
+        1. Fetch .codeyak/ files from the target repository via VCS
+        2. If no project files found, auto-load built-in 'default' guideline set
 
         Each guideline set (file) becomes a separate review pass.
 
@@ -54,12 +53,8 @@ class GuidelinesProvider:
         Raises:
             GuidelinesLoadError: If files are invalid or includes cannot be resolved
         """
-        # Try to fetch from VCS first (if in CI/CD context)
+        # Fetch from VCS (the target repository's .codeyak/ directory)
         project_yaml_files = self._fetch_yaml_files_from_vcs(self.vcs, merge_request_id)
-
-        # Fall back to local filesystem (for local development)
-        if not project_yaml_files or len(project_yaml_files) == 0:
-            project_yaml_files = self._scan_project_yaml_files()
 
         if project_yaml_files:
             guideline_sets = self._load_project_guidelines(project_yaml_files)
