@@ -408,15 +408,39 @@ class CommitBatch(BaseModel):
     total_batches: int = Field(..., description="Total number of batches")
 
 
+class CommitLesson(BaseModel):
+    """A lesson extracted from a single commit about what went wrong."""
+    sha: str = Field(..., description="First 8 characters of the commit SHA")
+    what_went_wrong: str = Field(..., description="What specific problem this commit fixed")
+    root_cause: str = Field(..., description="Why did this happen?")
+    prevention_principle: str = Field(..., description="General principle that prevents this class of issue")
+
+
+class LessonExtractionResult(BaseModel):
+    """Result from extracting lessons from a batch of commits."""
+    lessons: List[CommitLesson] = Field(default_factory=list, description="Lessons extracted from commits")
+
+
 class GeneratedGuideline(BaseModel):
     """
     A guideline generated from git history analysis.
     """
-    label: str = Field(..., description="Short identifier (e.g., 'missing-error-handling')")
+    label: str = Field(..., description="Short kebab-case identifier (e.g., 'missing-error-handling')")
     description: str = Field(..., description="The guideline instruction")
     reasoning: str = Field(..., description="Why this guideline was generated")
     confidence: str = Field(default="medium", description="Confidence level: 'low', 'medium', or 'high'")
     occurrence_count: int = Field(default=1, description="Number of times this pattern was observed")
+
+    @field_validator('label')
+    @classmethod
+    def normalize_label(cls, v: str) -> str:
+        """Normalize label to valid kebab-case matching parser expectations."""
+        v = v.lower().strip().replace('_', '-').replace(' ', '-')
+        v = re.sub(r'[^a-z0-9-]', '', v)
+        v = re.sub(r'-+', '-', v).strip('-')
+        if not v:
+            raise ValueError("Label must not be empty")
+        return v
 
 
 class GuidelineGenerationResult(BaseModel):

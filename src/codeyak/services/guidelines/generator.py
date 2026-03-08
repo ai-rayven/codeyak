@@ -15,6 +15,8 @@ from codeyak.infrastructure.vcs.local_git import LocalGitAdapter
 from codeyak.domain.models import (
     HistoricalCommit,
     CommitBatch,
+    CommitLesson,
+    LessonExtractionResult,
     GeneratedGuideline,
     GuidelineGenerationResult,
     ConsolidatedGuidelines,
@@ -29,6 +31,7 @@ from codeyak.ui import NullProgressReporter
 HIGH_SIGNAL_TYPES = {
     CommitSignal.BUG_FIX,
     CommitSignal.REVERT,
+    CommitSignal.REFACTOR,
     CommitSignal.SECURITY_FIX,
 }
 
@@ -41,7 +44,7 @@ class GuidelinesGenerator:
     then consolidates and formats them as codeyak guidelines.
     """
 
-    BATCH_SIZE = 50
+    BATCH_SIZE = 10
     CLASSIFICATION_BATCH_SIZE = 25
     MAX_DIFF_LINES = 100
     MAX_GUIDELINES_PER_BATCH = 10
@@ -157,44 +160,64 @@ class GuidelinesGenerator:
                 trace.end()
             return self._format_empty_yaml()
 
-        # 5. Batch commits
+        # 5. Extract lessons (batched)
         batches = self._batch_commits(commits)
-        self.progress.info(f"Created {len(batches)} batches for analysis.")
+        self.progress.info(f"Created {len(batches)} batches for lesson extraction.")
 
-        # 6. Analyze each batch with progress bar
-        all_guidelines: List[GeneratedGuideline] = []
+        all_lessons: List[CommitLesson] = []
 
-        task = self.progress.start_progress("Analyzing batches...", total=len(batches))
+        task = self.progress.start_progress("Extracting lessons...", total=len(batches))
         try:
             for batch in batches:
                 self.progress.update_progress(
                     task,
-                    f"Analyzing batch {batch.batch_number}/{batch.total_batches}"
+                    f"Extracting lessons from batch {batch.batch_number}/{batch.total_batches}"
                 )
-                result = self._analyze_batch(batch, trace=trace)
-                all_guidelines.extend(result.guidelines)
+                result = self._extract_lessons(batch, trace=trace)
+                all_lessons.extend(result.lessons)
                 self.progress.advance_progress(task)
         finally:
             self.progress.stop_progress()
 
-        self.progress.info(f"Found {len(all_guidelines)} potential guidelines.")
+        self.progress.info(f"Extracted {len(all_lessons)} lessons.")
 
-        if not all_guidelines:
-            self.progress.warning("No patterns identified in commit history.")
+        if not all_lessons:
+            self.progress.warning("No lessons extracted from commit history.")
+            if trace:
+                trace.update_trace(output={"guideline_count": 0}, tags=[project_name, "no_lessons"])
+                trace.end()
+            return self._format_empty_yaml()
+
+        # 6. Synthesize guidelines from lessons
+        self.progress.info("Synthesizing guidelines from lessons...")
+        self.progress.start_status("Synthesizing guidelines...")
+        try:
+            guidelines_result = self._synthesize_guidelines(all_lessons, trace=trace)
+        finally:
+            self.progress.stop_status()
+
+        self.progress.info(f"Synthesized {len(guidelines_result.guidelines)} guidelines.")
+
+        if not guidelines_result.guidelines:
+            self.progress.warning("No guidelines synthesized from lessons.")
             if trace:
                 trace.update_trace(output={"guideline_count": 0}, tags=[project_name, "no_guidelines"])
                 trace.end()
             return self._format_empty_yaml()
 
-        # 7. Consolidate guidelines
-        self.progress.info(f"Consolidating {len(all_guidelines)} guidelines...")
-        self.progress.start_status("Consolidating guidelines...")
-        try:
-            consolidated = self._consolidate_guidelines(
-                all_guidelines, trace=trace, existing_guidelines=existing_guidelines
-            )
-        finally:
-            self.progress.stop_status()
+        # 7. Consolidate (only needed for incremental mode with existing guidelines)
+        if existing_guidelines:
+            self.progress.info("Consolidating with existing guidelines...")
+            self.progress.start_status("Consolidating guidelines...")
+            try:
+                consolidated = self._consolidate_guidelines(
+                    guidelines_result.guidelines, trace=trace, existing_guidelines=existing_guidelines
+                )
+            finally:
+                self.progress.stop_status()
+        else:
+            consolidated = ConsolidatedGuidelines(guidelines=guidelines_result.guidelines)
+
         self.progress.success(f"Final guidelines: {len(consolidated.guidelines)}")
 
         # End trace with output
@@ -448,21 +471,19 @@ Return a classification for each commit."""
 
         return batches
 
-    def _analyze_batch(self, batch: CommitBatch, trace=None) -> GuidelineGenerationResult:
-        """Analyze a batch of commits with LLM."""
-        messages = self._build_analysis_messages(batch)
+    def _extract_lessons(self, batch: CommitBatch, trace=None) -> LessonExtractionResult:
+        """Extract per-commit lessons from a batch of commits."""
+        messages = self._build_lesson_extraction_messages(batch)
 
-        # Start generation if tracing
         generation = None
         if trace:
             generation = trace.start_generation(
-                name=f"analyze_batch_{batch.batch_number}",
+                name=f"extract_lessons_{batch.batch_number}",
                 input=messages,
             )
 
-        response = self.llm.generate(messages, response_model=GuidelineGenerationResult)
+        response = self.llm.generate(messages, response_model=LessonExtractionResult)
 
-        # End generation with output
         if generation:
             generation.update(
                 model=response.model,
@@ -476,29 +497,20 @@ Return a classification for each commit."""
 
         return response.result
 
-    def _build_analysis_messages(self, batch: CommitBatch) -> List[dict]:
-        """Construct LLM prompts for batch analysis."""
-        system_prompt = """
-You are an expert code reviewer analyzing git commit history.
+    def _build_lesson_extraction_messages(self, batch: CommitBatch) -> List[dict]:
+        """Construct LLM prompts for lesson extraction from commits."""
+        system_prompt = """You are analyzing git commits to understand what went wrong and why.
 
-Your goal is to extract guidelines that help junior developers not make the same mistake again.
+For each commit, extract:
+- **what_went_wrong**: The specific problem this commit fixes or improves
+- **root_cause**: Why this happened (missing validation, wrong assumption, race condition, unclear API contract, etc.)
+- **prevention_principle**: The general rule that prevents this CLASS of issue
 
-## WHAT TO LOOK FOR
+Be specific about root causes. "Developer error" is not a root cause.
+A good prevention_principle is actionable: "Validate that API response contains expected fields before destructuring" not "Validate inputs."
 
-1. **Recurring bug categories** - Classes of issues that appear across projects (e.g., input validation, async error handling)
+If a commit doesn't clearly fix a problem or improve something (e.g., pure feature addition with no lesson), skip it."""
 
-## GUIDELINE FORMAT
-
-Each guideline needs:
-- **label**: Short kebab-case identifier (e.g., 'responsive-layouts', 'validate-external-inputs')
-- **description**: Clear, actionable instruction explaining the general principle that can be used by a reviewer when reviewing the code
-
-## OUTPUT
-
-Return 3-6 guidelines per batch. 
-"""
-
-        # Format commits for analysis
         commits_text = []
         for commit in batch.commits:
             files_str = ", ".join(commit.files_changed[:10])
@@ -506,24 +518,100 @@ Return 3-6 guidelines per batch.
                 files_str += f" (+{len(commit.files_changed) - 10} more)"
 
             commit_text = f"""
-### Commit {commit.sha[:8]}
-**Author:** {commit.author}
-**Date:** {commit.date}
+---
+**SHA:** {commit.sha[:8]}
 **Message:** {commit.message}
+**Signal:** {commit.signal.value if commit.signal else "unknown"}
 **Files:** {files_str}
 
-**Diff excerpt:**
+**Diff:**
 ```
 {commit.diff_summary[:2000] if commit.diff_summary else "(no diff available)"}
 ```
 """
             commits_text.append(commit_text)
 
-        user_prompt = f"""Analyze the following {len(batch.commits)} commits (batch {batch.batch_number}/{batch.total_batches}) and identify patterns that should become code review guidelines:
+        user_prompt = f"""Extract lessons from the following {len(batch.commits)} commits:
 
 {"".join(commits_text)}
 
-Based on these commits, what guidelines would help prevent similar issues in future code reviews?"""
+For each commit that reveals a mistake or improvement opportunity, provide a lesson with sha, what_went_wrong, root_cause, and prevention_principle."""
+
+        return [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+
+    def _synthesize_guidelines(self, lessons: List[CommitLesson], trace=None) -> GuidelineGenerationResult:
+        """Synthesize guidelines from extracted lessons."""
+        messages = self._build_synthesis_messages(lessons)
+
+        generation = None
+        if trace:
+            generation = trace.start_generation(
+                name="synthesize_guidelines",
+                input=messages,
+            )
+
+        response = self.llm.generate(messages, response_model=GuidelineGenerationResult)
+
+        if generation:
+            generation.update(
+                model=response.model,
+                output=response.result.model_dump_json(),
+                usage_details={
+                    "input": response.token_usage.prompt_tokens,
+                    "output": response.token_usage.completion_tokens,
+                }
+            )
+            generation.end()
+
+        return response.result
+
+    def _build_synthesis_messages(self, lessons: List[CommitLesson]) -> List[dict]:
+        """Construct LLM prompts for guideline synthesis from lessons."""
+        system_prompt = """You are synthesizing code review guidelines from lessons extracted from git history.
+
+Group lessons with similar root causes or prevention principles. For each group, write one guideline.
+
+WHAT MAKES A GOOD GUIDELINE:
+- Specific enough to be actionable: "Validate external API response payloads contain expected fields before accessing" NOT "Validate inputs"
+- General enough to apply broadly: "Wrap external HTTP calls in timeout + retry" NOT "Add timeout to PaymentService.charge()"
+- Testable by a code reviewer reading a diff
+- Focused on prevention, not detection
+
+EXAMPLES:
+BAD: "Write better error handling"
+GOOD: "Catch specific exception types rather than bare except clauses. Log the original exception with traceback before re-raising."
+
+BAD: "Be careful with async code"
+GOOD: "Always await or properly handle the return value of async functions. Unawaited coroutines silently discard errors."
+
+Prefer guidelines that reference a specific category of mistake and can be verified by reading a code diff.
+Avoid guidelines so generic they could appear in any "coding best practices" blog post unchanged.
+
+GUIDELINE FORMAT:
+- **label**: Short kebab-case identifier (e.g., 'validate-external-responses', 'handle-async-errors')
+- **description**: Clear, actionable instruction (1-3 sentences)
+- **reasoning**: Brief explanation referencing the lessons that led to this guideline
+- **confidence**: high/medium/low based on how many lessons support it
+- **occurrence_count**: Number of lessons that contributed to this guideline
+
+You MUST return 8-12 guidelines. Every lesson set contains valuable patterns — synthesize them."""
+
+        # Format lessons grouped by prevention_principle for easy scanning
+        lessons_text = []
+        for i, lesson in enumerate(lessons, 1):
+            lessons_text.append(f"""
+{i}. [{lesson.sha}] **What went wrong:** {lesson.what_went_wrong}
+   **Root cause:** {lesson.root_cause}
+   **Prevention principle:** {lesson.prevention_principle}""")
+
+        user_prompt = f"""Synthesize guidelines from these {len(lessons)} lessons extracted from git history:
+
+{"".join(lessons_text)}
+
+Group lessons with similar root causes, then produce 8-12 high-quality, actionable guidelines."""
 
         return [
             {"role": "system", "content": system_prompt},
@@ -536,10 +624,8 @@ Based on these commits, what guidelines would help prevent similar issues in fut
         trace=None,
         existing_guidelines: list[dict] | None = None,
     ) -> ConsolidatedGuidelines:
-        """Deduplicate and consolidate guidelines across batches."""
-        # Always call LLM when existing guidelines are present (need dedup comparison),
-        # otherwise skip if candidate count is small enough
-        if not existing_guidelines and len(all_guidelines) <= self.MAX_FINAL_GUIDELINES:
+        """Deduplicate new guidelines against existing ones (incremental mode only)."""
+        if not existing_guidelines:
             return ConsolidatedGuidelines(guidelines=all_guidelines)
 
         messages = self._build_consolidation_messages(all_guidelines, existing_guidelines)
@@ -571,9 +657,9 @@ Based on these commits, what guidelines would help prevent similar issues in fut
     def _build_consolidation_messages(
         self,
         guidelines: List[GeneratedGuideline],
-        existing_guidelines: list[dict] | None = None,
+        existing_guidelines: list[dict],
     ) -> List[dict]:
-        """Construct LLM prompts for guideline consolidation."""
+        """Construct LLM prompts for incremental guideline consolidation."""
         guidelines_text = []
         for i, g in enumerate(guidelines, 1):
             guidelines_text.append(f"""
@@ -583,72 +669,9 @@ Description: {g.description}
 Reasoning: {g.reasoning}
 """)
 
-        if existing_guidelines:
-            return self._build_incremental_consolidation_messages(
-                guidelines_text, existing_guidelines
-            )
-
-        system_prompt = """You are consolidating code review guidelines into a final, high-quality set of general principles.
-
-## YOUR TASK
-
-1. **GENERALIZE** - Convert specific guidelines into broadly applicable principles
-2. **MERGE** similar guidelines - combine those covering the same underlying principle
-3. **REMOVE** generic guidelines that any developer would know
-4. **ENHANCE** descriptions to be clear, actionable, and general
-5. **LIMIT** to 10-15 of the most valuable guidelines
-
-## GENERALIZATION STRATEGY
-
-When a guideline is too specific, extract the underlying principle:
-- "Use flex layouts in PWA flows" → "Use responsive layouts instead of fixed dimensions"
-- "Validate PaymentService responses" → "Validate external API responses before processing"
-- "Add retry logic to fetchUserData" → "Handle transient failures with appropriate retry strategies"
-
-## MERGING STRATEGY
-
-When merging similar guidelines:
-- Extract the common underlying principle
-- Use a general label that captures the pattern
-- Combine descriptions to be broadly applicable
-- Sum occurrence counts
-- Keep the highest confidence level
-
-## WHAT TO REMOVE
-
-Delete any guideline about:
-- Generic best practices any developer knows
-- Universal style rules (naming, formatting)
-- Standard tooling configurations
-- Vague advice without specific guidance
-- Specific file names, APIs, or module references that won't apply broadly
-
-## OUTPUT FORMAT
-
-Each final guideline needs only:
-- **label**: Short kebab-case identifier (general, not project-specific)
-- **description**: Clear, actionable principle (1-3 sentences, no project-specific references)
-- **reasoning**: Brief explanation of why this matters
-- **confidence**: high/medium/low
-- **occurrence_count**: How many times the pattern was observed"""
-
-        user_prompt = f"""Consolidate these {len(guidelines)} guidelines into 10-15 final guidelines.
-
-Focus on:
-- Generalizing specific guidelines into broadly applicable principles
-- Merging duplicates and similar guidelines
-- Removing generic advice everyone knows
-- Ensuring guidelines read like principles, not implementation details
-
-Input guidelines:
-{"".join(guidelines_text)}
-
-Return only the highest-quality, most broadly applicable guidelines."""
-
-        return [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ]
+        return self._build_incremental_consolidation_messages(
+            guidelines_text, existing_guidelines
+        )
 
     def _build_incremental_consolidation_messages(
         self,
@@ -680,6 +703,12 @@ Return **only** guidelines from the new candidates that add genuine value not al
 - Merge similar new candidates together before returning.
 - Remove generic advice any developer would know.
 - If nothing new is worth adding, return an **empty list** of guidelines.
+
+## QUALITY GATE — Remove any new candidate that:
+- Could appear in a generic "coding best practices" blog post unchanged
+- Doesn't reference a specific category of mistake
+- A senior developer would consider obvious
+- Cannot be verified by reading a code diff
 
 ## OUTPUT FORMAT
 
@@ -756,9 +785,12 @@ Return only genuinely new guidelines that are not already covered above. If noth
                 block_lines.append(f"{prefix}  {line}")
             return '\n'.join(block_lines)
         else:
-            # Simple inline, but escape if needed
-            if ':' in value or '#' in value or value.startswith('{') or value.startswith('['):
-                # Quote the value
+            # Quote if value contains YAML-special characters or patterns
+            needs_quoting = (
+                ':' in value or '#' in value
+                or value[0:1] in ('{', '[', '>', '|', '*', '&', '!', '?', '-', "'", '"', '@', '`', '%')
+            )
+            if needs_quoting:
                 escaped = value.replace('"', '\\"')
                 return f'{prefix}{key}: "{escaped}"'
             return f"{prefix}{key}: {value}"
