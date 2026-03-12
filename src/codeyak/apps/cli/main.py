@@ -9,7 +9,7 @@ Usage:
 import click
 
 from ... import __version__
-from .commands import review, mr, learn
+from .commands import review, mr, learn, summary
 
 
 @click.group()
@@ -22,6 +22,7 @@ def main():
 main.add_command(review)
 main.add_command(mr)
 main.add_command(learn)
+main.add_command(summary)
 
 
 if __name__ == "__main__":

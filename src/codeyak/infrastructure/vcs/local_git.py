@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import List, Dict, Optional
 
 from git import Repo
-from git.exc import InvalidGitRepositoryError
+from git.exc import BadName, GitCommandError, InvalidGitRepositoryError
 
 from ...protocols import VCSClient
 from ...domain.models import FileDiff, GuidelineViolation, MRComment, Commit, HistoricalCommit
@@ -229,6 +229,57 @@ class LocalGitAdapter(VCSClient):
             message: Ignored
         """
         pass
+
+    def get_commit_range_diff(self, start_ref: str, end_ref: str) -> List[FileDiff]:
+        """
+        Get file diffs between two git refs.
+
+        Args:
+            start_ref: Starting ref (e.g., "HEAD~3")
+            end_ref: Ending ref (e.g., "HEAD")
+
+        Returns:
+            List of FileDiff objects for changed files
+
+        Raises:
+            ValueError: If either ref is invalid
+        """
+        try:
+            start_commit = self.repo.commit(start_ref)
+            end_commit = self.repo.commit(end_ref)
+        except (BadName, GitCommandError) as e:
+            raise ValueError(f"Invalid git ref: {e}")
+
+        diffs = start_commit.diff(end_commit, create_patch=True)
+        return self._parse_git_diffs(diffs) if diffs else []
+
+    def get_commit_range_commits(self, start_ref: str, end_ref: str) -> List[Commit]:
+        """
+        Get commits between two git refs.
+
+        Args:
+            start_ref: Starting ref (e.g., "HEAD~3")
+            end_ref: Ending ref (e.g., "HEAD")
+
+        Returns:
+            List of Commit domain objects
+
+        Raises:
+            ValueError: If either ref is invalid
+        """
+        try:
+            commits = []
+            for commit in self.repo.iter_commits(f"{start_ref}..{end_ref}"):
+                commit_date = datetime.fromtimestamp(commit.committed_date, tz=timezone.utc)
+                commits.append(Commit(
+                    sha=commit.hexsha,
+                    message=commit.message.strip(),
+                    author=commit.author.name or "unknown",
+                    created_at=commit_date.isoformat(),
+                ))
+            return commits
+        except (BadName, GitCommandError) as e:
+            raise ValueError(f"Invalid git ref: {e}")
 
     def get_historical_commits(
         self,

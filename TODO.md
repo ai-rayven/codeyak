@@ -9,3 +9,9 @@ TODO:
 
 
 - in some cases when reviewing the code, the model may not have enough context about new language features and decides that it is invalid syntax and flag it
+
+
+
+-- TODO ASAP --
+
+- create video and put in gif format and add to README
