@@ -1,17 +1,13 @@
-<div align="center">
-
-<picture>
+<p align="center">
   <img src="https://raw.githubusercontent.com/ai-rayven/codeyak/main/images/codeyak-logo.png" alt="CodeYak" width="200">
-</picture>
-
-<h1>CodeYak</h1>
-<p><strong>Automated code review that enforces your team's standards.</strong></p>
-<p>
+</p>
+<h1 align="center">CodeYak</h1>
+<p align="center"><strong>Automated code review that enforces your team's standards.</strong></p>
+<p align="center">
   <a href="https://pypi.org/project/codeyak/"><img src="https://img.shields.io/pypi/v/codeyak" alt="PyPI"></a>
   <a href="https://pypi.org/project/codeyak/"><img src="https://img.shields.io/pypi/pyversions/codeyak" alt="Python"></a>
   <a href="https://github.com/ai-rayven/codeyak/blob/main/LICENSE"><img src="https://img.shields.io/pypi/l/codeyak" alt="License"></a>
 </p>
-</div>
 
 ---
 
