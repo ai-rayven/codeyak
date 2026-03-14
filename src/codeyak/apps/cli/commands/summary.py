@@ -1,5 +1,8 @@
+import os
 import sys
+from fnmatch import fnmatch
 from pathlib import Path
+from typing import List
 
 import click
 from rich.console import Console
@@ -8,7 +11,7 @@ from rich.markdown import Markdown
 from .... import __version__
 from ....config import get_settings, is_langfuse_configured
 from ....domain.constants import CODE_FILE_EXTENSIONS
-from ....domain.models import MergeRequest
+from ....domain.models import FileDiff, MergeRequest
 from ....infrastructure import GitLabAdapter, LocalGitAdapter, AzureAdapter
 from ....services import CodeProvider, SummaryGenerator
 from ....ui import RichProgressReporter
@@ -42,7 +45,14 @@ from ..helpers import ensure_llm_configured, ensure_gitlab_configured
     default=None,
     help="Path to git repository. Defaults to current directory.",
 )
-def summary(mr_id: str | None, project: str | None, num_commits: int | None, path: Path | None):
+@click.option(
+    "--exclude",
+    "exclude_patterns",
+    multiple=True,
+    help="Glob pattern to exclude files from summary (repeatable). "
+         "e.g. --exclude '*Tests.cs' --exclude 'tests/'",
+)
+def summary(mr_id: str | None, project: str | None, num_commits: int | None, path: Path | None, exclude_patterns: tuple[str, ...]):
     """Generate a summary of code changes."""
     # Validate mutual exclusivity
     if mr_id and num_commits:
@@ -79,12 +89,14 @@ def summary(mr_id: str | None, project: str | None, num_commits: int | None, pat
 
     summary_gen = SummaryGenerator(llm, langfuse=langfuse)
 
+    patterns = list(exclude_patterns) if exclude_patterns else None
+
     if mr_id:
-        merge_request = _summarize_mr(mr_id, project, progress)
+        merge_request = _summarize_mr(mr_id, project, progress, patterns)
     elif num_commits:
-        merge_request = _summarize_commits(num_commits, path, progress)
+        merge_request = _summarize_commits(num_commits, path, progress, patterns)
     else:
-        merge_request = _summarize_local(path, progress)
+        merge_request = _summarize_local(path, progress, patterns)
 
     if not merge_request.file_diffs:
         progress.warning("No changes found.")
@@ -119,7 +131,7 @@ def summary(mr_id: str | None, project: str | None, num_commits: int | None, pat
         langfuse.flush()
 
 
-def _summarize_local(path: Path | None, progress: RichProgressReporter) -> MergeRequest:
+def _summarize_local(path: Path | None, progress: RichProgressReporter, exclude_patterns: List[str] | None = None) -> MergeRequest:
     """Summarize local uncommitted changes."""
     repo_path = path or Path.cwd()
     progress.info(f"Summarizing uncommitted changes in {repo_path}...")
@@ -131,14 +143,14 @@ def _summarize_local(path: Path | None, progress: RichProgressReporter) -> Merge
         sys.exit(1)
 
     code = CodeProvider(vcs)
-    return code.get_merge_request("local", CODE_FILE_EXTENSIONS)
+    return code.get_merge_request("local", CODE_FILE_EXTENSIONS, exclude_patterns=exclude_patterns)
 
 
-def _summarize_mr(mr_id: str, project: str | None, progress: RichProgressReporter) -> MergeRequest:
+def _summarize_mr(mr_id: str, project: str | None, progress: RichProgressReporter, exclude_patterns: List[str] | None = None) -> MergeRequest:
     """Summarize a GitLab merge request."""
     ensure_gitlab_configured()
 
-    project_id = project 
+    project_id = project
     if not project_id:
         click.echo(
             "Error: --project is required for MR mode. ",
@@ -159,10 +171,26 @@ def _summarize_mr(mr_id: str, project: str | None, progress: RichProgressReporte
         sys.exit(1)
 
     code = CodeProvider(vcs)
-    return code.get_merge_request(mr_id, CODE_FILE_EXTENSIONS)
+    return code.get_merge_request(mr_id, CODE_FILE_EXTENSIONS, exclude_patterns=exclude_patterns)
 
 
-def _summarize_commits(num_commits: int, path: Path | None, progress: RichProgressReporter) -> MergeRequest:
+def _filter_by_exclusion(diffs: List[FileDiff], exclude_patterns: List[str]) -> List[FileDiff]:
+    """Filter out file diffs matching any exclusion pattern."""
+    def is_excluded(file_path: str) -> bool:
+        basename = os.path.basename(file_path)
+        for pattern in exclude_patterns:
+            if pattern.endswith("/"):
+                if file_path.startswith(pattern) or f"/{pattern}" in f"/{file_path}":
+                    return True
+            else:
+                if fnmatch(file_path, pattern) or fnmatch(basename, pattern):
+                    return True
+        return False
+
+    return [diff for diff in diffs if not is_excluded(diff.file_path)]
+
+
+def _summarize_commits(num_commits: int, path: Path | None, progress: RichProgressReporter, exclude_patterns: List[str] | None = None) -> MergeRequest:
     """Summarize the last N commits."""
     repo_path = path or Path.cwd()
     progress.info(f"Summarizing last {num_commits} commit(s) in {repo_path}...")
@@ -187,6 +215,10 @@ def _summarize_commits(num_commits: int, path: Path | None, progress: RichProgre
         d for d in file_diffs
         if any(d.file_path.endswith(ext) for ext in CODE_FILE_EXTENSIONS)
     ]
+
+    # Apply exclusion patterns
+    if exclude_patterns:
+        file_diffs = _filter_by_exclusion(file_diffs, exclude_patterns)
 
     return MergeRequest(
         id="local",

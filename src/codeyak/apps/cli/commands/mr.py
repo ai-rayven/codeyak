@@ -21,7 +21,14 @@ from ..helpers import ensure_gitlab_configured
 @click.command()
 @click.argument("mr_id")
 @click.argument("project_id", required=False)
-def mr(mr_id: str, project_id: str | None):
+@click.option(
+    "--exclude",
+    "exclude_patterns",
+    multiple=True,
+    help="Glob pattern to exclude files from review (repeatable). "
+         "e.g. --exclude '*Tests.cs' --exclude 'tests/'",
+)
+def mr(mr_id: str, project_id: str | None, exclude_patterns: tuple[str, ...]):
     """Review a GitLab merge request.
 
     MR_ID is the merge request ID to review.
@@ -106,7 +113,7 @@ def mr(mr_id: str, project_id: str | None):
         progress=progress,
     )
 
-    bot.review_merge_request(mr_id)
+    bot.review_merge_request(mr_id, exclude_patterns=list(exclude_patterns) if exclude_patterns else None)
 
     # Flush Langfuse traces
     if langfuse:

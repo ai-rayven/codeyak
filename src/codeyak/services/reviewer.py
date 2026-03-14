@@ -66,7 +66,7 @@ class CodeReviewer:
         )
         return trace, context
 
-    def review_merge_request(self, merge_request_id: str):
+    def review_merge_request(self, merge_request_id: str, exclude_patterns: List[str] | None = None):
         self.progress.start_timer()
         self.progress.info(f"Starting review for MR {merge_request_id}...")
 
@@ -77,7 +77,8 @@ class CodeReviewer:
 
         merge_request = self.code.get_merge_request(
             merge_request_id=merge_request_id,
-            extension_filters=CODE_FILE_EXTENSIONS
+            extension_filters=CODE_FILE_EXTENSIONS,
+            exclude_patterns=exclude_patterns,
         )
 
         # Start trace
@@ -302,7 +303,7 @@ class CodeReviewer:
         )
         self.progress.success(f"Total time: {self.progress.format_elapsed_time()}")
 
-    def review_local_changes(self) -> None:
+    def review_local_changes(self, exclude_patterns: List[str] | None = None) -> None:
         """
         Review local uncommitted changes.
 
@@ -315,7 +316,8 @@ class CodeReviewer:
         # Get merge request with filtered diffs
         merge_request = self.code.get_merge_request(
             merge_request_id="local",
-            extension_filters=CODE_FILE_EXTENSIONS
+            extension_filters=CODE_FILE_EXTENSIONS,
+            exclude_patterns=exclude_patterns,
         )
 
         # Check for empty diff

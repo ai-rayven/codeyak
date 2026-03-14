@@ -25,7 +25,14 @@ from ..helpers import ensure_llm_configured
     default=None,
     help="Path to git repository. Defaults to current directory.",
 )
-def review(path: Path | None):
+@click.option(
+    "--exclude",
+    "exclude_patterns",
+    multiple=True,
+    help="Glob pattern to exclude files from review (repeatable). "
+         "e.g. --exclude '*Tests.cs' --exclude 'tests/'",
+)
+def review(path: Path | None, exclude_patterns: tuple[str, ...]):
     """Review local uncommitted changes."""
     # Show banner first
     progress = RichProgressReporter()
@@ -94,7 +101,7 @@ def review(path: Path | None):
         progress=progress,
     )
 
-    bot.review_local_changes()
+    bot.review_local_changes(exclude_patterns=list(exclude_patterns) if exclude_patterns else None)
 
     # Flush Langfuse traces
     if langfuse:

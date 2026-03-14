@@ -4,6 +4,8 @@ Code service for retrieving merge request data.
 Provides high-level interface for fetching merge requests with filtering capabilities.
 """
 
+import os
+from fnmatch import fnmatch
 from typing import List
 from ..protocols import VCSClient
 from ..domain.models import MergeRequest, FileDiff
@@ -23,7 +25,8 @@ class CodeProvider:
     def get_merge_request(
         self,
         merge_request_id: str,
-        extension_filters: List[str]
+        extension_filters: List[str],
+        exclude_patterns: List[str] | None = None,
     ) -> MergeRequest:
         """
         Fetch a merge request with its file diffs, comments, and commits.
@@ -41,6 +44,10 @@ class CodeProvider:
 
         # Apply extension filters if provided
         filtered_diffs = self._filter_by_extension(all_diffs, extension_filters)
+
+        # Apply exclusion patterns if provided
+        if exclude_patterns:
+            filtered_diffs = self._filter_by_exclusion(filtered_diffs, exclude_patterns)
 
         # Fetch all comments
         comments = self.vcs_client.get_comments(merge_request_id)
@@ -90,3 +97,27 @@ class CodeProvider:
             diff for diff in diffs
             if any(diff.file_path.endswith(ext) for ext in normalized_extensions)
         ]
+
+    def _filter_by_exclusion(
+        self,
+        diffs: List[FileDiff],
+        exclude_patterns: List[str],
+    ) -> List[FileDiff]:
+        """
+        Filter out file diffs matching any exclusion pattern.
+
+        Patterns ending with '/' are treated as directory prefixes.
+        Other patterns are matched against both the full path and the basename.
+        """
+        def is_excluded(file_path: str) -> bool:
+            basename = os.path.basename(file_path)
+            for pattern in exclude_patterns:
+                if pattern.endswith("/"):
+                    if file_path.startswith(pattern) or f"/{pattern}" in f"/{file_path}":
+                        return True
+                else:
+                    if fnmatch(file_path, pattern) or fnmatch(basename, pattern):
+                        return True
+            return False
+
+        return [diff for diff in diffs if not is_excluded(diff.file_path)]
