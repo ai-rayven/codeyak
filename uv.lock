@@ -238,7 +238,7 @@ wheels = [
 
 [[package]]
 name = "codeyak"
-version = "0.0.15"
+version = "0.0.17"
 source = { editable = "." }
 dependencies = [
     { name = "click" },
@@ -270,7 +270,7 @@ requires-dist = [
     { name = "click", specifier = ">=8.1.0" },
     { name = "gitpython", specifier = ">=3.1.0" },
     { name = "instructor", specifier = ">=1.14.1" },
-    { name = "langfuse", specifier = ">=3.11.2" },
+    { name = "langfuse", specifier = "==3.14.5" },
     { name = "openai", specifier = ">=2.15.0" },
     { name = "pydantic-settings", specifier = ">=2.12.0" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">=8.0.0" },
@@ -724,7 +724,7 @@ wheels = [
 
 [[package]]
 name = "langfuse"
-version = "3.12.0"
+version = "3.14.5"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "backoff" },
@@ -738,9 +738,9 @@ dependencies = [
     { name = "requests" },
     { name = "wrapt" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/05/d2/33991342653d101715faae8f82c14eb3f0a5c2d22d8c99df9dbb8d099802/langfuse-3.12.0.tar.gz", hash = "sha256:0f75b3d21d4ef4014ebeaa8188eb0c855200412b4e4fb8cceca609a7ce465f91", size = 232651 }
+sdist = { url = "https://files.pythonhosted.org/packages/ec/6b/7a945e8bc56cbf343b6f6171fd45870b0ea80ea38463b2db8dd5a9dc04a2/langfuse-3.14.5.tar.gz", hash = "sha256:2f543ec1540053d39b08a50ed5992caf1cd54d472a55cb8e5dcf6d4fcb7ff631", size = 235474 }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/c3/87/141689c2c2b352ed100de4a63f64f24b4df7f883ba2a3fc0c6733d9d0451/langfuse-3.12.0-py3-none-any.whl", hash = "sha256:644d9bbfa842eb6775b1e069e23f77ad1087f5241682966b8168bbb01f9c357e", size = 416875 },
+    { url = "https://files.pythonhosted.org/packages/a3/a1/10f04224542d6a57073c4f339b6763836a0899c98966f1d4ffcf56d2cf61/langfuse-3.14.5-py3-none-any.whl", hash = "sha256:5054b1c705ec69bce2d7077ce7419727ac629159428da013790979ca9cae77d5", size = 421240 },
 ]
 
 [[package]]
