@@ -4,6 +4,7 @@ Local git adapter for reviewing uncommitted changes.
 Implements VCSClient protocol for local git operations using GitPython.
 """
 
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import List, Dict, Optional
@@ -56,10 +57,37 @@ class LocalGitAdapter(VCSClient):
             # Fall back to directory name
             return self.repo_path.name
 
+    def get_gitlab_project_path(self) -> Optional[str]:
+        """
+        Infer GitLab project path (e.g., 'group/project') from the origin remote URL.
+
+        Handles both SSH (git@gitlab.com:group/project.git) and
+        HTTPS (https://gitlab.com/group/project.git) formats.
+
+        Returns:
+            Project path string or None if not parseable.
+        """
+        try:
+            remote_url = self.repo.remotes.origin.url
+        except (AttributeError, IndexError):
+            return None
+
+        # SSH format: git@gitlab.com:group/project.git
+        ssh_match = re.match(r'^git@[^:]+:(.+?)(?:\.git)?$', remote_url)
+        if ssh_match:
+            return ssh_match.group(1)
+
+        # HTTPS format: https://gitlab.com/group/project.git
+        https_match = re.match(r'^https?://[^/]+/(.+?)(?:\.git)?$', remote_url)
+        if https_match:
+            return https_match.group(1)
+
+        return None
+
     def get_mr_author(self, mr_id: str) -> str:
         v = self.get_username()
         return v
-        
+
     def get_username(self) -> str:
         """Get the current git user as the author."""
         try:
