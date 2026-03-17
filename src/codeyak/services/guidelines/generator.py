@@ -189,7 +189,6 @@ class GuidelinesGenerator:
             return self._format_empty_yaml()
 
         # 6. Synthesize guidelines from lessons
-        self.progress.info("Synthesizing guidelines from lessons...")
         self.progress.start_status("Synthesizing guidelines...")
         try:
             guidelines_result = self._synthesize_guidelines(all_lessons, trace=trace)

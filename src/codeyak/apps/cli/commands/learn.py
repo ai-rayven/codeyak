@@ -252,4 +252,5 @@ def _run_pr_analysis(
         )
 
     # Print suggested guidelines to stdout
-    click.echo("\n" + yaml_output)
+    if yaml_output:
+        click.echo("\n" + yaml_output)
