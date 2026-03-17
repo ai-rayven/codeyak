@@ -19,11 +19,13 @@ Public API:
 from .provider import GuidelinesProvider
 from .parser import GuidelinesParser
 from .generator import GuidelinesGenerator
+from .pr_review_generator import PRReviewGuidelinesGenerator
 
 __all__ = [
     'GuidelinesProvider',
     'GuidelinesParser',
     'GuidelinesGenerator',
+    'PRReviewGuidelinesGenerator',
     'GuidelinesLoadError',
     'BuiltinGuidelineNotFoundError',
     'GuidelineIncludeError',

@@ -486,3 +486,29 @@ class CommitClassificationBatch(BaseModel):
         default_factory=list,
         description="Classifications for each commit in the batch"
     )
+
+
+# --- PR Review Analysis Domain Models ---
+
+class ReviewLesson(BaseModel):
+    """A lesson extracted from a reviewer comment on a merged MR."""
+    mr_id: str = Field(..., description="MR internal ID")
+    comment_id: str = Field(..., description="Comment ID that sourced this lesson")
+    reviewer: str = Field(..., description="Who left the feedback")
+    file_path: Optional[str] = Field(None, description="File path if inline comment")
+    what_was_caught: str = Field(..., description="What specific issue the reviewer identified")
+    root_cause: str = Field(..., description="Why the author made this mistake")
+    prevention_principle: str = Field(..., description="General rule to prevent this class of issue")
+
+
+class ReviewLessonExtractionResult(BaseModel):
+    """Result from extracting lessons from a batch of MR review comments."""
+    lessons: List[ReviewLesson] = Field(default_factory=list)
+
+
+class MRSummary(BaseModel):
+    """Lightweight MR info for listing merged MRs."""
+    iid: str = Field(..., description="MR internal ID")
+    title: str = Field(..., description="MR title")
+    author: str = Field(..., description="MR author username")
+    merged_at: str = Field(..., description="When the MR was merged")

@@ -1,4 +1,5 @@
 import gitlab
+from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict
 from gitlab.v4.objects import ProjectMergeRequest
 
@@ -7,6 +8,7 @@ from ...domain.models import (
     FileDiff,
     GuidelineViolation,
     MRComment,
+    MRSummary,
     Commit,
 )
 from ...domain.exceptions import LineNotInDiffError, VCSCommentError, VCSFetchCommentsError
@@ -340,3 +342,86 @@ class GitLabAdapter(VCSClient):
             raise VCSFetchCommentsError(f"Failed to fetch .codeyak files: {e}") from e
         except Exception as e:
             raise VCSFetchCommentsError(f"Unexpected error fetching .codeyak files: {e}") from e
+
+    def list_merged_mrs(self, since_days: int = 365, max_mrs: int = 100) -> List[MRSummary]:
+        """
+        List recently merged MRs for the project.
+
+        Args:
+            since_days: Only include MRs merged within this many days
+            max_mrs: Maximum number of MRs to return
+
+        Returns:
+            List of MRSummary objects
+
+        Raises:
+            VCSFetchCommentsError: When fetching MRs fails
+        """
+        since_date = datetime.now(timezone.utc) - timedelta(days=since_days)
+        since_str = since_date.strftime("%Y-%m-%dT%H:%M:%SZ")
+
+        try:
+            mrs = self.project.mergerequests.list(
+                state='merged',
+                updated_after=since_str,
+                order_by='updated_at',
+                sort='desc',
+                per_page=min(max_mrs, 100),
+                get_all=max_mrs > 100,
+            )
+
+            summaries = []
+            for mr in mrs[:max_mrs]:
+                merged_at = mr.merged_at or mr.updated_at or ''
+                author = mr.author.get('username', 'unknown') if mr.author else 'unknown'
+                summaries.append(MRSummary(
+                    iid=str(mr.iid),
+                    title=mr.title,
+                    author=author,
+                    merged_at=merged_at,
+                ))
+
+            return summaries
+
+        except gitlab.exceptions.GitlabGetError as e:
+            raise VCSFetchCommentsError(f"Failed to list merged MRs: {e}") from e
+        except Exception as e:
+            raise VCSFetchCommentsError(f"Unexpected error listing merged MRs: {e}") from e
+
+    def get_mr_diff_summary(self, mr_iid: str, max_lines: int = 150) -> str:
+        """
+        Get a truncated diff summary for a merged MR.
+
+        Args:
+            mr_iid: MR internal ID
+            max_lines: Maximum number of diff lines to return
+
+        Returns:
+            Truncated diff as string
+        """
+        try:
+            mr = self._get_mr(mr_iid)
+            changes = mr.changes(access_raw_diffs=True)
+
+            lines = []
+            for change in changes.get('changes', []):
+                if change.get('deleted_file'):
+                    continue
+
+                file_path = change.get('new_path', '')
+                raw_diff = change.get('diff', '')
+
+                lines.append(f"--- {file_path} ---")
+                lines.extend(raw_diff.split("\n"))
+
+                if len(lines) >= max_lines:
+                    break
+
+            if len(lines) > max_lines:
+                lines = lines[:max_lines]
+                lines.append("\n... (truncated)")
+
+            return "\n".join(lines)
+
+        except Exception:
+            return ""
