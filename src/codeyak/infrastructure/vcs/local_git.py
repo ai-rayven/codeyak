@@ -186,7 +186,7 @@ class LocalGitAdapter(VCSClient):
             return None
 
         try:
-            return full_path.read_text()
+            return full_path.read_text(encoding="utf-8")
         except Exception:
             return None
 
@@ -208,7 +208,7 @@ class LocalGitAdapter(VCSClient):
         yaml_files = {}
         for yaml_file in sorted(list(codeyak_dir.glob("*.yaml")) + list(codeyak_dir.glob("*.yml"))):
             try:
-                yaml_files[yaml_file.name] = yaml_file.read_text()
+                yaml_files[yaml_file.name] = yaml_file.read_text(encoding="utf-8")
             except Exception:
                 continue
 

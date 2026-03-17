@@ -109,7 +109,7 @@ class GuidelinesProvider:
 
         for filename, content in sorted(yaml_files_content.items()):
             temp_file = temp_dir / filename
-            temp_file.write_text(content)
+            temp_file.write_text(content, encoding="utf-8")
             temp_files.append(temp_file)
 
         return temp_files
