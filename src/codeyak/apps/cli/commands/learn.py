@@ -98,7 +98,7 @@ def learn(days: int, source: str, mr: str | None, project_id: str | None):
 
     if output_path.exists():
         try:
-            parsed = yaml.safe_load(output_path.read_text())
+            parsed = yaml.safe_load(output_path.read_text(encoding="utf-8"))
             if parsed and isinstance(parsed.get("guidelines"), list):
                 existing_guidelines = parsed["guidelines"]
                 progress.info(f"Found {len(existing_guidelines)} existing guidelines.")
@@ -168,18 +168,18 @@ def _run_commit_analysis(
         else:
             # Append new guideline entries to the existing file
             new_yaml_lines = generator.format_guidelines_as_yaml_entries(new_guidelines)
-            existing_content = output_path.read_text()
+            existing_content = output_path.read_text(encoding="utf-8")
             # Ensure there's a newline before appending
             if not existing_content.endswith("\n"):
                 existing_content += "\n"
-            output_path.write_text(existing_content + new_yaml_lines)
+            output_path.write_text(existing_content + new_yaml_lines, encoding="utf-8")
             progress.success(
                 f"Appended {len(new_guidelines)} new guidelines to {output_path}"
             )
             progress.info("Review and customize the new guidelines.")
     else:
         # Fresh write
-        output_path.write_text(yaml_output)
+        output_path.write_text(yaml_output, encoding="utf-8")
         progress.success(f"Guidelines written to {output_path}")
         progress.info(
             "Review and customize the generated guidelines before using them."
