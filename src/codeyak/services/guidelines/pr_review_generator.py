@@ -150,7 +150,6 @@ class PRReviewGuidelinesGenerator:
         diff_summary = self.gitlab_vcs.get_mr_diff_summary(mr_iid, max_lines=self.MAX_DIFF_LINES)
 
         # Extract lessons
-        self.progress.info("Extracting lessons from reviewer feedback...")
         self.progress.start_status("Extracting lessons...")
         try:
             lessons = self._extract_review_lessons(
@@ -263,8 +262,8 @@ class PRReviewGuidelinesGenerator:
         filtered = []
         for comment in comments:
             # Skip MR author's own comments
-            if comment.author == mr_author:
-                continue
+#            if comment.author == mr_author:
+                #continue
 
             # Skip bot comments
             if BOT_PATTERNS.search(comment.author):
@@ -397,7 +396,6 @@ For each comment that reveals a meaningful code quality issue or mistake, provid
         existing_guidelines: list[dict] | None = None,
     ) -> str | None:
         """Synthesize guidelines from lessons, consolidate, and format."""
-        self.progress.info("Synthesizing guidelines from reviewer feedback...")
         self.progress.start_status("Synthesizing guidelines...")
         try:
             guidelines_result = self._synthesize_guidelines(lessons, trace=trace)
@@ -413,7 +411,6 @@ For each comment that reveals a meaningful code quality issue or mistake, provid
 
         # Consolidate against existing guidelines
         if existing_guidelines:
-            self.progress.info("Consolidating with existing guidelines...")
             self.progress.start_status("Consolidating guidelines...")
             try:
                 consolidated = self._consolidate_guidelines(
