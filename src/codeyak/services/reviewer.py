@@ -1,4 +1,5 @@
 import time
+import concurrent.futures
 from typing import Any, ContextManager, Dict, List, Tuple
 from contextlib import nullcontext
 from rich.rule import Rule
@@ -140,12 +141,8 @@ class CodeReviewer:
                 input=messages,  # Full ChatML format
             )
 
-        # Call LLM with spinner
-        self.progress.start_status("Analyzing code...")
-        try:
-            output = self.llm.generate(messages, response_model=ReviewResult)
-        finally:
-            self.progress.stop_status()
+        # Call LLM (progress managed at _run_review level)
+        output = self.llm.generate(messages, response_model=ReviewResult)
 
         # End generation with output
         if generation:
@@ -261,13 +258,35 @@ class CodeReviewer:
         total_original_violations = 0
         total_filtered_violations = 0
 
+        # --- Phase A: parallel LLM calls ---
+        n = len(guideline_sets)
+        task = self.progress.start_progress(
+            f"Reviewing {n} guideline set{'s' if n != 1 else ''}...", total=n
+        )
+
+        results: Dict[str, ReviewResult] = {}
+
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future_to_filename = {
+                executor.submit(
+                    self._get_review_result_traced,
+                    merge_request, summary, filename, guidelines, trace, smart_context
+                ): filename
+                for filename, guidelines in guideline_sets.items()
+            }
+            for future in concurrent.futures.as_completed(future_to_filename):
+                filename = future_to_filename[future]
+                results[filename] = future.result()  # re-raises on LLM error
+                self.progress.advance_progress(task)
+
+        self.progress.stop_progress()
+
+        # --- Phase B: sequential feedback (original insertion order) ---
         for filename, guidelines in guideline_sets.items():
             console.print()
             console.print(f"[brand]Reviewing with {filename}[/brand] [muted]({len(guidelines)} guidelines)[/muted]")
 
-            result = self._get_review_result_traced(
-                merge_request, summary, filename, guidelines, trace, smart_context
-            )
+            result = results[filename]
 
             # Filter duplicates and track both counts
             filtered_result, original_count = self._filter_existing_violations(
