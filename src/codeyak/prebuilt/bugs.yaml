@@ -1,0 +1,63 @@
+# Bug Prevention Guidelines
+# This guideline set targets the most common sources of bugs in software development.
+# Use this to catch logic errors, resource issues, and unsafe patterns before they ship.
+
+guidelines:
+  # Null / None Safety
+  - label: null-dereference
+    description: Always check for null/None before accessing properties or methods. Prefer early returns, guard clauses, or null-safe access patterns instead of assuming values are non-null.
+
+  # Iteration & Indexing
+  - label: off-by-one
+    description: Verify loop bounds, slice indices, and range conditions carefully. Prefer language idioms (e.g., enumerate, iterating collections directly) over manual index arithmetic to avoid fence-post errors.
+
+  - label: collection-mutation-during-iteration
+    description: Never add or remove elements from a collection while iterating over it. Iterate over a copy or collect changes and apply them after the loop.
+
+  # Error Handling
+  - label: swallowed-exceptions
+    description: >
+      Do not silently catch and discard exceptions without any record.
+      When suppressing an exception is intentional (e.g., a best-effort cleanup or a known benign error),
+      at minimum emit a debug-level log explaining why it is safe to ignore.
+      Bare except/catch blocks with no logging or re-raise make failures invisible and should be flagged.
+
+  - label: ignored-return-values
+    description: Do not ignore return values that signal success, failure, or an error code. Always check the result of operations that can fail.
+
+  # Resource Management
+  - label: resource-leaks
+    description: Always release resources (files, database connections, sockets, locks) after use. Prefer context managers (with/using/try-with-resources) over manual close calls to guarantee cleanup.
+
+  # Concurrency
+  - label: shared-mutable-state
+    description: Protect shared mutable state accessed from multiple threads or coroutines. Use locks, atomics, or immutable data structures. Avoid non-atomic read-modify-write sequences on shared objects.
+
+  # Numeric & Type Safety
+  - label: float-equality
+    description: Do not compare floating-point numbers with ==. Use an epsilon tolerance or a library helper (e.g., math.isclose) to account for precision errors.
+
+  - label: integer-overflow
+    description: Be aware of integer size limits when performing arithmetic. Check for overflow conditions, especially in loops, offsets, and size calculations.
+
+  - label: implicit-type-coercion
+    description: Avoid relying on implicit type conversions. Explicitly cast or convert values and be aware of lossy conversions (e.g., float-to-int truncation, string-to-number edge cases with empty or non-numeric input).
+
+  # Logic & State
+  - label: boolean-logic
+    description: Verify boolean conditions carefully. Watch for operator precedence issues, De Morgan's law mistakes, and incorrect negation that silently invert the intended logic.
+
+  - label: uninitialized-state
+    description: Ensure variables are initialized before use. Avoid patterns where a variable may remain unset if a conditional branch is skipped. Avoid stale state carried over from a previous call or request.
+
+  # Edge Cases
+  - label: boundary-conditions
+    description: Handle edge cases explicitly — empty inputs, single-element collections, zero, negative numbers, and maximum/minimum values. Do not assume inputs are always well-formed or within expected ranges.
+
+  # Time & Dates
+  - label: timezone-awareness
+    description: Always use timezone-aware datetime objects. Never mix naive and timezone-aware datetimes. Store and compare times in UTC; convert to local time only at display boundaries.
+
+  # Duplication
+  - label: duplicated-logic
+    description: Avoid duplicating logic across multiple code paths. Duplicated code with subtle differences is a common source of bugs. Extract shared logic into a single authoritative function.
