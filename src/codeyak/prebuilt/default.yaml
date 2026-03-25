@@ -4,3 +4,4 @@
 
 includes:
   - builtin:code-quality
+  - builtin:bugs
