@@ -1,3 +1,4 @@
+import gzip
 import gitlab
 from datetime import datetime, timedelta, timezone
 from typing import List, Optional, Dict
@@ -288,7 +289,10 @@ class GitLabAdapter(VCSClient):
             )
 
             # Decode content (base64 encoded by default)
-            content = file.decode().decode('utf-8')
+            raw = file.decode()
+            if raw[:2] == b'\x1f\x8b':
+                raw = gzip.decompress(raw)
+            content = raw.decode('utf-8')
             return content
 
         except gitlab.exceptions.GitlabGetError as e:
