@@ -9,7 +9,7 @@ Usage:
 import click
 
 from ... import __version__
-from .commands import review, mr, learn, summary
+from .commands import review, mr, learn, summary, install_skill
 
 
 @click.group()
@@ -23,6 +23,7 @@ main.add_command(review)
 main.add_command(mr)
 main.add_command(learn)
 main.add_command(summary)
+main.add_command(install_skill)
 
 
 if __name__ == "__main__":
