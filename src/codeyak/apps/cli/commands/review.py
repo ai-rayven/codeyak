@@ -12,9 +12,10 @@ from ....services import (
     CodeProvider,
     CodeReviewContextBuilder,
     ConsoleFeedbackPublisher,
+    JsonFeedbackPublisher,
     SummaryGenerator,
 )
-from ....ui import RichProgressReporter
+from ....ui import RichProgressReporter, stderr_console
 from ..helpers import ensure_llm_configured
 
 
@@ -32,10 +33,22 @@ from ..helpers import ensure_llm_configured
     help="Glob pattern to exclude files from review (repeatable). "
          "e.g. --exclude '*Tests.cs' --exclude 'tests/'",
 )
-def review(path: Path | None, exclude_patterns: tuple[str, ...]):
+@click.option(
+    "--json",
+    "json_output",
+    is_flag=True,
+    default=False,
+    help="Output results as JSON to stdout. Progress output goes to stderr.",
+)
+def review(path: Path | None, exclude_patterns: tuple[str, ...], json_output: bool):
     """Review local uncommitted changes."""
+    # In JSON mode, use stderr for all progress output so stdout is clean JSON
+    if json_output:
+        progress = RichProgressReporter(console=stderr_console)
+    else:
+        progress = RichProgressReporter()
+
     # Show banner first
-    progress = RichProgressReporter()
     progress.banner("Codeyak", __version__)
 
     # Ensure LLM is configured before proceeding
@@ -87,8 +100,13 @@ def review(path: Path | None, exclude_patterns: tuple[str, ...]):
     )
     guidelines = GuidelinesProvider(vcs)
     code = CodeProvider(vcs)
-    feedback = ConsoleFeedbackPublisher()
     summary = SummaryGenerator(llm, langfuse=langfuse)
+
+    # Choose feedback publisher based on output mode
+    if json_output:
+        feedback = JsonFeedbackPublisher()
+    else:
+        feedback = ConsoleFeedbackPublisher()
 
     bot = CodeReviewer(
         context=context,
