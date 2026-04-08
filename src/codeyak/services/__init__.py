@@ -8,7 +8,7 @@ from .reviewer import CodeReviewer
 from .guidelines import GuidelinesProvider, GuidelinesGenerator, PRReviewGuidelinesGenerator
 from .code import CodeProvider
 from .context_builder import CodeReviewContextBuilder
-from .feedback import MergeRequestFeedbackPublisher, ConsoleFeedbackPublisher
+from .feedback import MergeRequestFeedbackPublisher, ConsoleFeedbackPublisher, JsonFeedbackPublisher
 from .summary import SummaryGenerator
 
 __all__ = [
@@ -20,5 +20,6 @@ __all__ = [
     "CodeReviewContextBuilder",
     "MergeRequestFeedbackPublisher",
     "ConsoleFeedbackPublisher",
+    "JsonFeedbackPublisher",
     "SummaryGenerator",
 ]

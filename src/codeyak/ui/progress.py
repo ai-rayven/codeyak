@@ -14,7 +14,9 @@ from rich.panel import Panel
 from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn, TimeElapsedColumn
 from rich.text import Text
 
-from .console import console, BRAND_BORDER
+from rich.console import Console
+
+from .console import console as default_console, BRAND_BORDER
 
 
 def format_duration(seconds: float) -> str:
@@ -34,7 +36,8 @@ class RichProgressReporter:
     Provides spinners, colors, and progress bars for a rich CLI experience.
     """
 
-    def __init__(self):
+    def __init__(self, console: Console | None = None):
+        self._console = console or default_console
         self._progress: Progress | None = None
         self._status: Any = None
         self._status_progress: Progress | None = None
@@ -52,19 +55,19 @@ class RichProgressReporter:
             border_style=BRAND_BORDER,
             padding=(0, 2),
         )
-        console.print(panel)
+        self._console.print(panel)
 
     def info(self, message: str) -> None:
         """Display an informational message."""
-        console.print(f"[info]{message}[/info]")
+        self._console.print(f"[info]{message}[/info]")
 
     def warning(self, message: str) -> None:
         """Display a warning message."""
-        console.print(f"[warning]{message}[/warning]")
+        self._console.print(f"[warning]{message}[/warning]")
 
     def success(self, message: str) -> None:
         """Display a success message."""
-        console.print(f"[success]{message}[/success]")
+        self._console.print(f"[success]{message}[/success]")
 
     def start_progress(self, description: str, total: int) -> Any:
         """Start a progress bar and return a task handle."""
@@ -73,7 +76,7 @@ class RichProgressReporter:
             TextColumn("[progress.description]{task.description}"),
             BarColumn(complete_style=BRAND_BORDER, finished_style="#CD853F"),
             TaskProgressColumn(),
-            console=console,
+            console=self._console,
         )
         self._progress.start()
         task = self._progress.add_task(f"[info]{description}[/info]", total=total)
@@ -101,7 +104,7 @@ class RichProgressReporter:
             SpinnerColumn(spinner_name="dots", style="#A0522D"),
             TextColumn("[info]{task.description}[/info]"),
             TimeElapsedColumn(),
-            console=console,
+            console=self._console,
             transient=True,
         )
         self._status_progress.start()
