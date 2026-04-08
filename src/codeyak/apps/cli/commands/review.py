@@ -117,6 +117,7 @@ def review(path: Path | None, exclude_patterns: tuple[str, ...], json_output: bo
         summary=summary,
         langfuse=langfuse,
         progress=progress,
+        console=stderr_console if json_output else None,
     )
 
     bot.review_local_changes(exclude_patterns=list(exclude_patterns) if exclude_patterns else None)
