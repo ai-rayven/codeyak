@@ -154,7 +154,11 @@ def full_report(records):
         branch = r.get("git_branch", "?")
         total = r.get("total_violations", 0)
         high = r.get("total_high_confidence", 0)
-        print(f"  {ts}  branch={branch}  violations={total} (high={high})")
+        session = r.get("claude_session_id", "")
+        line = f"  {ts}  branch={branch}  violations={total} (high={high})"
+        if session:
+            line += f"  session={session}"
+        print(line)
 
 
 def main():

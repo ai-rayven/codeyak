@@ -9,6 +9,7 @@ Works cross-platform (Windows, macOS, Linux).
 """
 
 import json
+import os
 import subprocess
 import sys
 from collections import Counter
@@ -78,8 +79,12 @@ def main():
 
     git_sha, git_branch = get_git_info()
 
+    # Capture Claude session ID if running inside Claude Code
+    claude_session_id = os.environ.get("CLAUDE_SESSION_ID", "")
+
     record = {
         "timestamp": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "claude_session_id": claude_session_id,
         "git_sha": git_sha,
         "git_branch": git_branch,
         "files_reviewed": sorted(files_with_violations),
