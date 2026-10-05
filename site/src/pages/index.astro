@@ -1,0 +1,233 @@
+---
+// Replace with the form ID from your Formspree dashboard (https://formspree.io/f/<id>).
+const FORMSPREE_FORM_ID: string = 'xoejaonv';
+
+if (FORMSPREE_FORM_ID === 'your_form_id') {
+  throw new Error('Set FORMSPREE_FORM_ID in src/pages/index.astro before building.');
+}
+
+const formAction = `https://formspree.io/f/${FORMSPREE_FORM_ID}`;
+const title = 'Codeyak | Evaluate agents against your codebase';
+const description =
+  'Stop trusting generic benchmarks. Run AI coding agents directly on your repositories to see how they perform in the real world.';
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="generator" content={Astro.generator} />
+    <meta name="description" content={description} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:type" content="website" />
+    <link rel="icon" type="image/png" href="/codeyak-logo.png" />
+    <title>{title}</title>
+  </head>
+  <body>
+    <main class="container">
+      <img src="/codeyak-logo.png" alt="Codeyak logo" class="logo" width="120" height="120" />
+
+      <h1>Evaluate agents against <span class="highlight-blue">your codebase</span>, not SWE Bench.</h1>
+
+      <p class="subtitle">{description}</p>
+
+      <form id="waitlist-form" class="waitlist-form" action={formAction} method="POST">
+        <input type="email" name="email" placeholder="you@company.com" required autocomplete="email" aria-label="Email address" />
+        <input type="text" name="_gotcha" class="honeypot" tabindex="-1" autocomplete="off" aria-hidden="true" />
+        <button type="submit">Join Waitlist</button>
+      </form>
+      <p id="form-status" class="form-status" role="status" aria-live="polite"></p>
+    </main>
+
+    <script>
+      const form = document.getElementById('waitlist-form');
+      const status = document.getElementById('form-status');
+
+      if (form instanceof HTMLFormElement && status) {
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+          const button = form.querySelector('button');
+          if (button) button.disabled = true;
+          status.textContent = '';
+          status.dataset.state = '';
+
+          try {
+            const response = await fetch(form.action, {
+              method: 'POST',
+              body: new FormData(form),
+              headers: { Accept: 'application/json' },
+            });
+            if (!response.ok) throw new Error(`Formspree returned ${response.status}`);
+
+            form.reset();
+            status.textContent = "Thanks! You're on the waitlist.";
+            status.dataset.state = 'success';
+          } catch {
+            status.textContent = 'Something went wrong. Please try again.';
+            status.dataset.state = 'error';
+          } finally {
+            if (button) button.disabled = false;
+          }
+        });
+      }
+    </script>
+  </body>
+</html>
+
+<style is:global>
+  :root {
+    --bg-color: #050505;
+    --text-primary: #f4f4f5;
+    --text-secondary: #a1a1aa;
+    --border-color: #27272a;
+    --accent-orange: #ff682c;
+    --accent-blue: #9de0f6;
+    --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  }
+
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    margin: 0;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+  }
+</style>
+
+<style>
+  .container {
+    max-width: 640px;
+    padding: 2rem;
+    width: 100%;
+    box-sizing: border-box;
+  }
+
+  .logo {
+    width: 120px;
+    height: 120px;
+    border-radius: 20px;
+    margin-bottom: 2rem;
+    display: block;
+    box-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  h1 {
+    font-size: 2.75rem;
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    margin: 0 0 1.25rem 0;
+    line-height: 1.1;
+  }
+
+  .highlight-blue {
+    color: var(--accent-blue);
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    font-weight: normal;
+  }
+
+  .subtitle {
+    font-size: 1.125rem;
+    color: var(--text-secondary);
+    margin: 0 0 2.5rem 0;
+    line-height: 1.6;
+    max-width: 90%;
+  }
+
+  .waitlist-form {
+    display: flex;
+    gap: 0.75rem;
+  }
+
+  input[type='email'] {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--border-color);
+    color: var(--text-primary);
+    padding: 0.875rem 1rem;
+    font-size: 1rem;
+    border-radius: 8px;
+    font-family: inherit;
+    outline: none;
+    transition: all 0.2s ease;
+  }
+
+  input[type='email']:focus {
+    border-color: var(--accent-blue);
+    box-shadow: 0 0 0 1px var(--accent-blue);
+    background: rgba(157, 224, 246, 0.02);
+  }
+
+  input[type='email']::placeholder {
+    color: #52525b;
+  }
+
+  .honeypot {
+    display: none;
+  }
+
+  button {
+    background: var(--accent-orange);
+    color: #ffffff;
+    border: none;
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+  }
+
+  button:hover:not(:disabled) {
+    transform: translateY(-1px);
+    background: #ff7b45;
+    box-shadow: 0 4px 12px rgba(255, 104, 44, 0.25);
+  }
+
+  button:active {
+    transform: translateY(0);
+  }
+
+  button:disabled {
+    opacity: 0.6;
+    cursor: wait;
+  }
+
+  .form-status {
+    min-height: 1.5rem;
+    margin: 1rem 0 0 0;
+    font-size: 0.95rem;
+  }
+
+  .form-status[data-state='success'] {
+    color: var(--accent-blue);
+  }
+
+  .form-status[data-state='error'] {
+    color: var(--accent-orange);
+  }
+
+  @media (max-width: 480px) {
+    h1 {
+      font-size: 2.25rem;
+    }
+    .waitlist-form {
+      flex-direction: column;
+    }
+    button {
+      width: 100%;
+    }
+  }
+</style>
