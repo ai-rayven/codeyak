@@ -1,13 +1,14 @@
 import time
 from typing import Any, ContextManager, Dict, List, Tuple
 from contextlib import nullcontext
+from rich.console import Console
 from rich.rule import Rule
 
 from codeyak.protocols import LLMClient, FeedbackPublisher, ProgressReporter
 from codeyak.ui.progress import format_duration
 from codeyak.domain.models import ChangeSummary, Guideline, MergeRequest, ReviewResult, MRComment
 from codeyak.domain.constants import CODE_FILE_EXTENSIONS
-from codeyak.ui import console, BRAND_BORDER, NullProgressReporter
+from codeyak.ui import console as default_console, BRAND_BORDER, NullProgressReporter
 from langfuse import propagate_attributes
 
 from .guidelines import GuidelinesProvider
@@ -27,6 +28,7 @@ class CodeReviewer:
         summary: SummaryGenerator,
         langfuse=None,
         progress: ProgressReporter | None = None,
+        console: Console | None = None,
     ):
         self.context = context
         self.code = code
@@ -36,6 +38,7 @@ class CodeReviewer:
         self.summary = summary
         self.langfuse = langfuse
         self.progress = progress or NullProgressReporter()
+        self._console = console or default_console
 
     def _start_trace(self, merge_request: MergeRequest) -> Tuple[Any, ContextManager]:
         """Start Langfuse trace and return (trace, propagate_context)."""
@@ -207,8 +210,8 @@ class CodeReviewer:
             merge_request: MergeRequest object with diffs, commits, and id
             trace: Langfuse trace object (None if tracing disabled)
         """
-        console.print()
-        console.print(Rule("[brand]Generating MR Summary[/brand]", style=BRAND_BORDER, align="left"))
+        self._console.print()
+        self._console.print(Rule("[brand]Generating MR Summary[/brand]", style=BRAND_BORDER, align="left"))
 
         # Generate summary using LLM (with tracing)
         self.progress.start_status("Generating summary...")
@@ -262,8 +265,8 @@ class CodeReviewer:
         total_filtered_violations = 0
 
         for filename, guidelines in guideline_sets.items():
-            console.print()
-            console.print(f"[brand]Reviewing with {filename}[/brand] [muted]({len(guidelines)} guidelines)[/muted]")
+            self._console.print()
+            self._console.print(f"[brand]Reviewing with {filename}[/brand] [muted]({len(guidelines)} guidelines)[/muted]")
 
             result = self._get_review_result_traced(
                 merge_request, summary, filename, guidelines, trace, smart_context
@@ -296,7 +299,7 @@ class CodeReviewer:
         # Show review time (analysis only), then violations, then total time
         review_elapsed = time.monotonic() - review_start_time
         self.progress.success(f"Review complete in {format_duration(review_elapsed)}")
-        console.print(Rule(style=BRAND_BORDER))
+        self._console.print(Rule(style=BRAND_BORDER))
         self.feedback.post_review_summary(
             total_original_violations,
             total_filtered_violations
